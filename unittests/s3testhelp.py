@@ -77,7 +77,8 @@ class S3TestHelp:
 
                 uniform_sep = rel.replace(os.sep, '/')
 
-                content = open(fp, 'rb').read()[:100]
+                with open(fp, 'rb') as f:
+                    content = f.read()[:100]
                 size = os.stat(fp).st_size
 
                 entry = {'Key': uniform_sep, 'Size': size, 'Body': content}
