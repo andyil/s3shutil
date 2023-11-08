@@ -160,6 +160,59 @@ class S3ShutilEngine:
                                     self.logger.info('Download to %s', local_file)
                                     to_do.append(('download_file', {'Bucket': bucket, 'Key': key, 'Filename': local_file}))
 
+    def execute_rmtree(self):
+        bucket, root = self.parse_s3_path(self.s3root)
+        to_do = [('list_objects_v2', {'Bucket': bucket, 'Prefix': root})]
+        to_delete_keys = []
+        futures = set()
+        with ThreadPoolExecutor(max_workers=25) as tp:
+            while to_do or futures:
+                if to_do and len(futures) < 100:
+                    method, kwargs = to_do.pop()
+                    future = tp.submit(self.s3_execute, method, kwargs)
+                    futures.add(future)
+                else:
+                    done, notdone = wait(futures, None, FIRST_COMPLETED)
+                    futures = notdone
+                    for future_done in done:
+                        method, kwargs, r = future_done.result()
+                        if method == 'list_objects_v2':
+                            if r['IsTruncated']:
+                                token = r['NextContinuationToken']
+                                kwargs = {'Bucket': bucket, 'Prefix': root, 'ContinuationToken': token}
+                                to_do.append(('list_objects_v2', kwargs))
+
+                            entries = r.get('Contents', [])
+                            for entry in entries:
+                                to_delete_keys.append({'Key': entry['Key']})
+                                if len(to_delete_keys) == 1000:
+                                    to_do.append(('delete_objects', {'Bucket': bucket, 'Delete': {'Objects': to_delete_keys}}))
+                                    to_delete_keys = []
+                        elif method == 'delete_objects':
+                            errors = r.get('Errors', [])
+                            if errors:
+                                self.logger.error('%s errors', len(errors))
+                                for error in errors:
+                                    self.logger.error('Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
+                                        error)
+                                raise Exception('Could not delete Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
+                                        errors[0])
+
+
+            future = tp.submit(self.s3_execute, 'delete_objects', {'Bucket': bucket, 'Delete': {'Objects': to_delete_keys}})
+            done, notdone = wait([future], None, ALL_COMPLETED)
+            assert len(notdone) == 0
+            for f in done:
+                method, kwargs, r = f.result()
+                errors = r.get('Errors', [])
+                if errors:
+                    self.logger.error('%s errors', len(errors))
+                    for error in errors:
+                        self.logger.error('Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
+                            error)
+                    raise Exception('Could not delete Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
+                            errors[0])
+
 
 
 
@@ -186,3 +239,8 @@ def copytree(src, dst):
     else:
         import shutil
         shutil.copytree(src, dst)
+
+def rmtree(src):
+    if _is_s3(src):
+        s3sh = S3ShutilEngine(None, src)
+        s3sh.execute_rmtree()
