@@ -56,7 +56,7 @@ class S3TestHelp:
         prefix = '/'.join(parts[3:])
         result = []
         r = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        contents = r['Contents']
+        contents = r.get('Contents', [])
         for elem in contents:            
             key = elem['Key']
             r = s3.get_object(Bucket=bucket, Key=key, Range='bytes 0-100/*')

@@ -68,6 +68,16 @@ class TestStringMethods(unittest.TestCase):
         print(j2)
         print(j3)
 
+    def test_rmtree(self):
+        open(f'{self.fsroot1}/c.txt', 'w').write('da1dsasd')
+        open(f'{self.fsroot1}/a.txt', 'w').write('sdf')
+        open(f'{self.fsroot1}/b.txt', 'w').write('dadsasfdsdsd')
+        s3shutil.copytree(self.fsroot1, self.s3root1)
+        j1 = self.s3th.s3_root_to_json(self.s3root1)
+        s3shutil.rmtree(self.s3root1)
+        j2 = self.s3th.s3_root_to_json(self.s3root1)
+        print(j1)
+        print(j2)
    
 
 if __name__ == '__main__':
