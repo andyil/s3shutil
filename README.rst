@@ -29,7 +29,7 @@ Design Principles
 
 Using s3shutil
 ~~~~~~~~~~~~~~
-s3shutil uses `botoe <https://github.com/boto/boto3>`_ internally and we assume you have your credentials set up properly.
+s3shutil uses `boto3 <https://github.com/boto/boto3>`_ internally and we assume you have your credentials set up properly.
 
 Using s3shutil is super easy:
 
