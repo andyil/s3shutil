@@ -36,6 +36,7 @@ Using s3shutil is super easy:
 **Download a directory tree from s3**:
 
 .. code-block:: python
+    
     import s3shutil
     s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/')
 
@@ -44,6 +45,7 @@ Using s3shutil is super easy:
 Just replace the order of the arguments, as you might have expected.
 
 .. code-block:: python
+
     import s3shutil
     s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/')
 
@@ -54,6 +56,7 @@ Same or different bucket.
 s3shutil will notice and use server to server (s3 object copy) for you.
 
 .. code-block:: python
+
     import s3shutil
     s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/')
 
@@ -62,5 +65,6 @@ s3shutil will notice and use server to server (s3 object copy) for you.
 s3shutil will notice and internally use batch delete.
 
 .. code-block:: python
+
     import s3shutil
     s3shutil.rmtree('s3://bucket/my-files/documents/')
