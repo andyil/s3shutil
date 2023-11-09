@@ -47,16 +47,18 @@ Just replace the order of the arguments, as you might have expected.
     import s3shutil
     s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/')
 
-**Copy a directory tree from s3 to another location in s3** (
+**Copy a directory tree from s3 to another location in s3.**
 
 Same or different bucket.
+
 s3shutil will notice and use server to server (s3 object copy) for you.
 
 .. code-block:: python
     import s3shutil
     s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/')
 
-**Delete multiple files from s3**:
+**Delete multiple files from s3.**
+
 s3shutil will notice and internally use batch delete.
 
 .. code-block:: python
