@@ -11,9 +11,9 @@ setup(
   packages = ['s3shutil'],
 
   long_description=description,
-  long_description_content_type='text/rst',
+  long_description_content_type='text/x-rst',
 
-  version = '0.29',
+  version = '0.30',
   license='MIT',
   description = 'A shutil like interface to AWS S3',
   url = 'https://github.com/andyil/s3shutil',
