@@ -78,6 +78,17 @@ class TestStringMethods(unittest.TestCase):
         s3shutil.rmtree(self.s3root1)
         j2 = self.s3th.s3_root_to_json(self.s3root1)
         self.assertObjEq(j2, [])
+
+    def test_s3_to_s3(self):
+        self.write(f'{self.fsroot1}/c.txt', 'da1dsasd')
+        self.write(f'{self.fsroot1}/a.txt', 'sfg')
+        self.write(f'{self.fsroot1}/b.txt', 'dadsasfdsdsd')    
+        s3shutil.copytree(self.fsroot1, self.s3root1)
+        s3shutil.copytree(self.s3root1, self.s3root2)
+        j1 = self.s3th.s3_root_to_json(self.s3root1)        
+        j2 = self.s3th.s3_root_to_json(self.s3root2)
+        self.assertObjEq(j2, j1)
+
    
 
 if __name__ == '__main__':

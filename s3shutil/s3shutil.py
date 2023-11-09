@@ -1,4 +1,3 @@
-import shutil
 from os.path import join, relpath, sep, dirname, splitdrive, split
 from os import walk, makedirs
 import logging
@@ -160,6 +159,39 @@ class S3ShutilEngine:
                                     self.logger.info('Download to %s', local_file)
                                     to_do.append(('download_file', {'Bucket': bucket, 'Key': key, 'Filename': local_file}))
 
+    def execute_s3_to_s3_copy(self, src, dst):
+        bucket, root = self.parse_s3_path(src)
+        dst_bucket, dst_prefix = self.parse_s3_path(dst)
+        to_do = [('list_objects_v2', {'Bucket': bucket, 'Prefix': root})]
+        futures = set()
+        with ThreadPoolExecutor(max_workers=25) as tp:
+            while to_do or futures:
+                if to_do and len(futures) < 100:
+                    method, kwargs = to_do.pop()
+                    future = tp.submit(self.s3_execute, method, kwargs)
+                    futures.add(future)
+                else:
+                    done, notdone = wait(futures, None, FIRST_COMPLETED)
+                    futures = notdone
+                    for future_done in done:
+                        method, kwargs, r = future_done.result()
+                        if method == 'list_objects_v2':
+                            if r['IsTruncated']:
+                                token = r['NextContinuationToken']
+                                kwargs = {'Bucket': bucket, 'Prefix': root, 'ContinuationToken': token}
+                                to_do.append(('list_objects_v2', kwargs))
+
+                            if r['Contents']:
+                                for entry in r['Contents']:
+                                    key = entry['Key']
+                                    relative = key.replace(root, '')
+                                    abs_dst = f'{dst_prefix}{relative}'
+                                    self.logger.info('Copy to %s:%s to %s:%s', bucket, key, dst_bucket, abs_dst)
+                                    copy_source = {'Bucket': bucket, 'Key': key}
+                                    to_do.append(('copy_object', {'Bucket': dst_bucket, 'Key': abs_dst, 'CopySource': copy_source}))
+
+
+
     def execute_rmtree(self):
         bucket, root = self.parse_s3_path(self.s3root)
         to_do = [('list_objects_v2', {'Bucket': bucket, 'Prefix': root})]
@@ -221,7 +253,7 @@ def _is_s3(path):
     return path.startswith('s3://')
 
 
-def copytree_local_to_s3(src, dst):
+def _copytree_local_to_s3(src, dst):
     s3sh = S3ShutilEngine(src, dst)
     s3sh.execute_upload()
 
@@ -229,18 +261,27 @@ def _copytree_s3_to_local(src, dst):
     s3sh = S3ShutilEngine(s3root=src, localroot=dst)
     s3sh.execute_download()
 
+def _copy_s3_to_s3(src, dst):
+    s3sh = S3ShutilEngine(s3root=src, localroot=dst)
+    s3sh.execute_s3_to_s3_copy(src, dst)
+
 def copytree(src, dst):
-    if _is_s3(src) and _is_s3(dst):
-        raise Exception('Unsupported: two s3 paths')
-    elif _is_s3(src) and not _is_s3(dst):
+    is_s3_src = _is_s3(src)
+    is_s3_dst = _is_s3(dst)
+    if not is_s3_src and not is_s3_dst:
+        raise Exception(f'Unsupported: two non s3 paths {src} and {dst}')
+    elif is_s3_src and not is_s3_dst:
         _copytree_s3_to_local(src, dst)
-    elif not _is_s3(src) and _is_s3(dst):
-        copytree_local_to_s3(src, dst)
-    else:
-        import shutil
-        shutil.copytree(src, dst)
+    elif not is_s3_src and is_s3_dst:
+        _copytree_local_to_s3(src, dst)
+    elif is_s3_src and is_s3_dst:
+        _copy_s3_to_s3(src, dst)
+
+
 
 def rmtree(src):
-    if _is_s3(src):
-        s3sh = S3ShutilEngine(None, src)
-        s3sh.execute_rmtree()
+    if not _is_s3(src):
+        raise Exception(f'Path {src} must start with s3://')
+
+    s3sh = S3ShutilEngine(None, src)
+    s3sh.execute_rmtree()
