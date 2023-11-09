@@ -1,6 +1,6 @@
-===============================
+===================================================
 The easiest way to manipulate multiple files in s3
-===============================
+===================================================
 
 
 s3shutil is the easiest to use and fastest way of manipulating directory files in s3,
@@ -19,7 +19,7 @@ We recommend installing from the official PyPI repository.
 
 
 Design Principles
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 * Expose a simple and intuitive string based API. 
 * Where possible, emulate the well known `shutil <https://docs.python.org/3/library/shutil.html>`_ standard module API.
 * Use multithreading behind the scenes for performance.

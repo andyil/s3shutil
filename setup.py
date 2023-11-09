@@ -1,19 +1,12 @@
 from distutils.core import setup
-import os
-
-directory = os.path.dirname(__file__)
-readme = os.path.join(directory, 'README.rst')
-with open(readme, 'r') as f:
-  description = f.read()
 
 setup(
   name = 's3shutil',
   packages = ['s3shutil'],
 
-  long_description=description,
+  long_description=open('README.rst').read(),
   long_description_content_type='text/x-rst',
-
-  version = '0.30',
+  version = '0.34',
   license='MIT',
   description = 'A shutil like interface to AWS S3',
   url = 'https://github.com/andyil/s3shutil',
