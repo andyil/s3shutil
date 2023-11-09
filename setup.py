@@ -4,7 +4,7 @@ import os
 directory = os.path.dirname(__file__)
 readme = os.path.join(directory, 'README.rst')
 with open(readme, 'r') as f:
-  description = t.read()
+  description = f.read()
 
 setup(
   name = 's3shutil',
