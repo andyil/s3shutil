@@ -20,16 +20,16 @@ We recommend installing from the official PyPI repository.
 
 Design Principles
 ~~~~~~~~~~~~~~
-* Expose a simple and intuitive String based API. 
-* Where possible, emulate the well known shutil module API.
-* Use multi threading behind the scenes for performance.
+* Expose a simple and intuitive string based API. 
+* Where possible, emulate the well known `shutil <https://docs.python.org/3/library/shutil.html>`_ standard module API.
+* Use multithreading behind the scenes for performance.
 * Internally use batch APIs where available (deleting objects).
 * Internally use server to server APIs where possible (copy between s3 to s3).
 
 
 Using s3shutil
 ~~~~~~~~~~~~~~
-s3shutil uses boto3 internally and we assume you have your credentials set up properly.
+s3shutil uses `botoe <https://github.com/boto/boto3>`_ internally and we assume you have your credentials set up properly.
 
 Using s3shutil is super easy:
 
@@ -40,9 +40,9 @@ Using s3shutil is super easy:
     import s3shutil
     s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/')
 
-**Download a directory tree from s3.**
+**Upload a directory tree to s3.**
 
-Just replace the order of the arguments, as you might have expected.
+Just replace the order of the arguments, as you probably expected.
 
 .. code-block:: python
 
@@ -51,7 +51,7 @@ Just replace the order of the arguments, as you might have expected.
 
 **Copy a directory tree from s3 to another location in s3.**
 
-Same or different bucket.
+Supports same or different bucket.
 
 s3shutil will notice and use server to server (s3 object copy) for you.
 
