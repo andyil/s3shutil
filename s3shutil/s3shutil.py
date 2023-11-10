@@ -7,6 +7,7 @@ import sys
 import re
 
 import boto3
+import shutil 
 
 class S3ShutilEngine:
 
@@ -231,19 +232,20 @@ class S3ShutilEngine:
                                         errors[0])
 
 
-            future = tp.submit(self.s3_execute, 'delete_objects', {'Bucket': bucket, 'Delete': {'Objects': to_delete_keys}})
-            done, notdone = wait([future], None, ALL_COMPLETED)
-            assert len(notdone) == 0
-            for f in done:
-                method, kwargs, r = f.result()
-                errors = r.get('Errors', [])
-                if errors:
-                    self.logger.error('%s errors', len(errors))
-                    for error in errors:
-                        self.logger.error('Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
-                            error)
-                    raise Exception('Could not delete Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
-                            errors[0])
+            if to_delete_keys:
+                future = tp.submit(self.s3_execute, 'delete_objects', {'Bucket': bucket, 'Delete': {'Objects': to_delete_keys}})
+                done, notdone = wait([future], None, ALL_COMPLETED)
+                assert len(notdone) == 0
+                for f in done:
+                    method, kwargs, r = f.result()
+                    errors = r.get('Errors', [])
+                    if errors:
+                        self.logger.error('%s errors', len(errors))
+                        for error in errors:
+                            self.logger.error('Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
+                                error)
+                        raise Exception('Could not delete Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
+                                errors[0])
 
 
 
@@ -285,3 +287,11 @@ def rmtree(src):
 
     s3sh = S3ShutilEngine(None, src)
     s3sh.execute_rmtree()
+
+
+def move(src, dst):
+    copytree(src, dst)
+    if _is_s3(src):
+        rmtree(src)
+    else:
+        shutil.rmtree(src)

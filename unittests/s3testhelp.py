@@ -3,7 +3,7 @@ import secrets
 import datetime
 import logging
 import os
-
+import base64
 
 
 class S3TestHelp:
@@ -59,10 +59,12 @@ class S3TestHelp:
         contents = r.get('Contents', [])
         for elem in contents:            
             key = elem['Key']
-            r = s3.get_object(Bucket=bucket, Key=key, Range='bytes 0-100/*')
+            r = s3.get_object(Bucket=bucket, Key=key)
             text = r['Body'].read()
+            head_100 = text[:100]
+            encoded = base64.b64encode(head_100)
             rel = key.replace(prefix, '')
-            entry = {'Key': rel, 'Size': elem['Size'], 'Body': text[:100]}
+            entry = {'Key': rel, 'Size': elem['Size'], 'Body': encoded}
             result.append(entry)
 
         return result
@@ -79,6 +81,7 @@ class S3TestHelp:
 
                 with open(fp, 'rb') as f:
                     content = f.read()[:100]
+                    content = base64.b64encode(content)
                 size = os.stat(fp).st_size
 
                 entry = {'Key': uniform_sep, 'Size': size, 'Body': content}
