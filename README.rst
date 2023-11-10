@@ -1,9 +1,18 @@
 ===================================================
 The easiest way to manipulate multiple files in s3
 ===================================================
+|Unittests| |License| |Downloads| |Language|
 
-.. image:: https://github.com/andyil/s3shutil/actions/workflows/unitests.yml/badge.svg https://img.shields.io/pypi/dw/s3shutil
+.. |Unittests| image:: https://github.com/andyil/s3shutil/actions/workflows/unitests.yml/badge.svg
+    
+.. |License| image:: http://img.shields.io/pypi/v/boto3.svg?style=flat
+    :target: https://pypi.python.org/pypi/boto3/
+    :alt: Package Version
+.. |License| image:: https://img.shields.io/github/license/andyil/s3shutil
+    :target: https://github.com/andyil/s3shutil/blob/develop/LICENSE
+    :alt: License
 
+.. |Language| image:: https://img.shields.io/github/languages/top/andyil/s3shutil
 
 s3shutil is the easiest to use and fastest way of manipulating directory files in s3,
 probably at the expense of hiding API details you don't usually care.
