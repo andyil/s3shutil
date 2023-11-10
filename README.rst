@@ -2,6 +2,8 @@
 The easiest way to manipulate multiple files in s3
 ===================================================
 
+.. image:: https://github.com/andyil/s3shutil/actions/workflows/unitests.yml/badge.svg
+
 
 s3shutil is the easiest to use and fastest way of manipulating directory files in s3,
 probably at the expense of hiding API details you don't usually care.
