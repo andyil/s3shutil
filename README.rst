@@ -5,9 +5,8 @@ The easiest way to manipulate multiple files in s3
 
 .. |Unittests| image:: https://github.com/andyil/s3shutil/actions/workflows/unitests.yml/badge.svg
     
-.. |License| image:: http://img.shields.io/pypi/v/boto3.svg?style=flat
-    :target: https://pypi.python.org/pypi/boto3/
-    :alt: Package Version
+.. |Downloads| image:: https://img.shields.io/pypi/dw/s3shutil
+    
 .. |License| image:: https://img.shields.io/github/license/andyil/s3shutil
     :target: https://github.com/andyil/s3shutil/blob/develop/LICENSE
     :alt: License
