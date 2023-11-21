@@ -34,6 +34,7 @@ class S3ShutilEngine:
     def enumerate_local_triple(self, root):                
         for directory, directories, files in walk(root):
             directories.sort()
+            files.sort()
             for f in files:
                 full_path = join(directory, f)
                 s = stat(full_path)
@@ -90,11 +91,10 @@ class S3ShutilEngine:
         local_tagged = map(lambda x:(x, 'src'), local_keys)
         s3_tagged = map(lambda x:(x, 'dst' ), s3_keys)
 
+
         merged = heapq.merge(local_tagged, s3_tagged)
         grouped = itertools.groupby(merged, lambda x:x[0][0])
-        #print(list(grouped))
-        #for x in grouped:
-        #    print(x)
+
         grouped = map(lambda x: (x[0], list(x[1])), grouped)
         #print(list(actions))
         actions_map = {
@@ -102,11 +102,27 @@ class S3ShutilEngine:
                     ('src',): 'copy',
                     ('dst',): 'delete'
                 }
-        
-        for key, group in grouped:
-            actions_tuple = tuple((x[1] for x in group))
-            action = actions_map[actions_tuple]
-            print(f'{key} {action}')
+
+        with ThreadPoolExecutor(max_workers=25) as tp:
+            for key, group in grouped:
+                actions_tuple = tuple((x[1] for x in group))
+                action = actions_map[actions_tuple]
+                print(f'{key} {action}')
+            
+                future = tp.submit(self.upload, local_file)
+                futures.append(future)
+
+                while len(futures) > 100:
+                    done, notdone = wait(futures, None, FIRST_COMPLETED)
+                    for future in done:
+                        future.result() # so any exception throws is visible
+                    futures = list(notdone)
+
+            done, notdone = wait(futures, None, ALL_COMPLETED)
+            assert len(notdone) == 0
+            for future in done:
+                future.result()
+
         
 
     def execute_upload_multithreaded(self):

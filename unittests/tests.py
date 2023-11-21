@@ -116,6 +116,9 @@ class TestS3Shutil(unittest.TestCase):
         eng = S3ShutilEngine(None, None)
         
         os.unlink(os.path.join(self.fsroot1, 'd2', 'd'))
+        p = f'{self.s3root1}d3/d5/x'
+        print(f'Deleting {p}')
+        s3shutil.rmtree(p)
 
         eng.execute_upload_sync(self.fsroot1, self.s3root1)
 
