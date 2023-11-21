@@ -107,6 +107,22 @@ class TestS3Shutil(unittest.TestCase):
         j3 = self.s3th.fs_root_to_json(self.fsroot2)
         self.assertObjEq(j1, j2)
         self.assertObjEq(j1, j3)
+
+    def test_s3_to_a(self):
+        self.populate1()      
+        s3shutil.copytree(self.fsroot1, self.s3root1)
+
+        from s3shutil.s3shutil import S3ShutilEngine
+        eng = S3ShutilEngine(None, None)
+        
+        os.unlink(os.path.join(self.fsroot1, 'd2', 'd'))
+
+        eng.execute_upload_sync(self.fsroot1, self.s3root1)
+
+        
+        
+
+        
        
 
     def test_rmtree(self):

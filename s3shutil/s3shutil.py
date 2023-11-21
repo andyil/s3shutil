@@ -1,10 +1,12 @@
 from os.path import join, relpath, sep, dirname, splitdrive, split
-from os import walk, makedirs
+from os import walk, makedirs, stat, sep
 import logging
 from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED, FIRST_COMPLETED
 import threading
 import sys
 import re
+import itertools
+import heapq
 
 import boto3
 import shutil 
@@ -29,6 +31,34 @@ class S3ShutilEngine:
                 full_path = join(directory, f)
                 yield full_path
 
+    def enumerate_local_triple(self, root):                
+        for directory, directories, files in walk(root):
+            directories.sort()
+            for f in files:
+                full_path = join(directory, f)
+                s = stat(full_path)
+                last_modified = s.st_mtime
+                sz = s.st_size
+                relative = relpath(full_path, root)
+                slash_separate = relative.replace(sep, '/')
+                yield slash_separate, last_modified, sz
+
+    def enumerate_s3_triple(self, root):
+        bucket, prefix = self.parse_s3_path(root)
+        s3 = self.get_local_s3_client()
+        paginator = s3.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            contents = page.get('Contents', [])
+            for entry in contents:
+                key = entry['Key']
+                sz = entry['Size']
+                last_modified = entry['LastModified']
+                last_modified_ts = last_modified.timestamp()
+                relative = key.replace(prefix, '')
+                yield relative, last_modified_ts, sz
+
+
+
     def get_thread_local(self, attribute, factory_function, *factory_args):
         if hasattr(self.thread_local, attribute):
             return getattr(self.thread_local, attribute)
@@ -52,9 +82,32 @@ class S3ShutilEngine:
         s3client.upload_file(localfile, bucket, key)
 
 
-    def execute_upload_synch(self):
-        for local_file in self.enumerate_local(self.localroot):
-            self.upload(local_file)
+    def execute_upload_sync(self, local_root, s3_root):
+
+        local_keys = self.enumerate_local_triple(local_root)
+        s3_keys = self.enumerate_s3_triple(s3_root)
+
+        local_tagged = map(lambda x:(x, 'src'), local_keys)
+        s3_tagged = map(lambda x:(x, 'dst' ), s3_keys)
+
+        merged = heapq.merge(local_tagged, s3_tagged)
+        grouped = itertools.groupby(merged, lambda x:x[0][0])
+        #print(list(grouped))
+        #for x in grouped:
+        #    print(x)
+        grouped = map(lambda x: (x[0], list(x[1])), grouped)
+        #print(list(actions))
+        actions_map = {
+                    ('src', 'dst'): 'skip',
+                    ('src',): 'copy',
+                    ('dst',): 'delete'
+                }
+        
+        for key, group in grouped:
+            actions_tuple = tuple((x[1] for x in group))
+            action = actions_map[actions_tuple]
+            print(f'{key} {action}')
+        
 
     def execute_upload_multithreaded(self):
         futures = []
@@ -191,7 +244,11 @@ class S3ShutilEngine:
                                     copy_source = {'Bucket': bucket, 'Key': key}
                                     to_do.append(('copy_object', {'Bucket': dst_bucket, 'Key': abs_dst, 'CopySource': copy_source}))
 
+    def execute_sync(self, source, dest):
+        src_s3 = source.startswith('s3://')
+        dst_s3 = dest.startswith('s3://')
 
+        
 
     def execute_rmtree(self):
         bucket, root = self.parse_s3_path(self.s3root)
