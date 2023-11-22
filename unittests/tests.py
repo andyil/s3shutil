@@ -108,25 +108,73 @@ class TestS3Shutil(unittest.TestCase):
         self.assertObjEq(j1, j2)
         self.assertObjEq(j1, j3)
 
-    def test_s3_to_a(self):
+    def test_local_sync_to_s3_no_changes(self):
         self.populate1()      
         s3shutil.copytree(self.fsroot1, self.s3root1)
 
         from s3shutil.s3shutil import S3ShutilEngine
         eng = S3ShutilEngine(None, None)
         
-        os.unlink(os.path.join(self.fsroot1, 'd2', 'd'))
+        #os.unlink(os.path.join(self.fsroot1, 'd2', 'd'))
         p = f'{self.s3root1}d3/d5/x'
         print(f'Deleting {p}')
+        #s3shutil.rmtree(p)
+
+        eng.execute_upload_sync(self.fsroot1, self.s3root1)
+
+        j1 = self.s3th.s3_root_to_json(self.s3root1)
+        j2 = self.s3th.fs_root_to_json(self.fsroot1)
+
+        self.assertObjEq(j2, j1)
+
+    def test_local_sync_to_s3_only_upload(self):
+        self.populate1()
+        s3shutil.copytree(self.fsroot1, self.s3root1)
+
+        from s3shutil.s3shutil import S3ShutilEngine
+        eng = S3ShutilEngine(None, None)
+
+        p = f'{self.s3root1}d3/d5/x'
+        print(f'Del {p} for test')
         s3shutil.rmtree(p)
 
         eng.execute_upload_sync(self.fsroot1, self.s3root1)
 
-        
-        
+        j1 = self.s3th.s3_root_to_json(self.s3root1)
+        j2 = self.s3th.fs_root_to_json(self.fsroot1)
 
-        
-       
+        self.assertObjEq(j2, j1)
+
+    def test_local_sync_to_s3_only_delete(self):
+        self.populate1()
+        s3shutil.copytree(self.fsroot1, self.s3root1)
+
+        from s3shutil.s3shutil import S3ShutilEngine
+        eng = S3ShutilEngine(None, None)
+
+        delete_locally = os.path.join(self.fsroot1, 'd2', 'd')
+        print(f'Deleting {delete_locally}')
+        print(f'Exists {os.path.exists(delete_locally)}')
+        os.unlink(delete_locally)
+        #s3shutil.rmtree(p)
+        print('Deleted')
+        print(f'Exists {os.path.exists(delete_locally)}')
+
+        eng.execute_upload_sync(self.fsroot1, self.s3root1)
+
+        j1 = self.s3th.fs_root_to_json(self.fsroot1)
+        j2 = self.s3th.s3_root_to_json(self.s3root1)
+
+        l1 = list(map(lambda x: x['Key'], j1))
+        l2 = list(map(lambda x: x['Key'], j2))
+
+        print('local')
+        print(list(l1))
+        print('remote')
+        print(list(l2))
+
+        self.assertObjEq(l1, l2)
+
 
     def test_rmtree(self):
         self.populate1()      

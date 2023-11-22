@@ -9,7 +9,14 @@ import itertools
 import heapq
 
 import boto3
-import shutil 
+import shutil
+
+
+def parse_s3_path(s3path):
+    """"returns a (bucket, fullpath) tuple from a s3://bucket/path/to/key string"""
+    assert s3path[:5] == 's3://'
+    parts = s3path.split('/')
+    return parts[2], '/'.join(parts[3:])
 
 class S3ShutilEngine:
 
@@ -82,15 +89,28 @@ class S3ShutilEngine:
         bucket, key = self.parse_s3_path(s3_path)
         s3client.upload_file(localfile, bucket, key)
 
+    def upload2(self, local_absolute, local_relative, local_root, s3_root):
+        if local_relative is None:
+            local_relative = relpath(local_absolute, local_root)
+        elif local_absolute is None:
+            local_absolute = join(local_root, local_relative)
+
+        remote_relative = local_relative.replace(sep, '/')
+        s3_path = '%s%s' % (s3_root, remote_relative)
+        self.logger.info('Uploading %s to %s', local_absolute, s3_path)
+        s3client = self.get_local_s3_client()
+        bucket, key = self.parse_s3_path(s3_path)
+        s3client.upload_file(local_absolute, bucket, key)
+
 
     def execute_upload_sync(self, local_root, s3_root):
-
         local_keys = self.enumerate_local_triple(local_root)
         s3_keys = self.enumerate_s3_triple(s3_root)
 
         local_tagged = map(lambda x:(x, 'src'), local_keys)
-        s3_tagged = map(lambda x:(x, 'dst' ), s3_keys)
+        s3_tagged = map(lambda x:(x, 'dst'), s3_keys)
 
+        bucket, root = self.parse_s3_path(s3_root)
 
         merged = heapq.merge(local_tagged, s3_tagged)
         grouped = itertools.groupby(merged, lambda x:x[0][0])
@@ -103,14 +123,35 @@ class S3ShutilEngine:
                     ('dst',): 'delete'
                 }
 
+        to_delete_keys = []
+        futures = []
         with ThreadPoolExecutor(max_workers=25) as tp:
             for key, group in grouped:
                 actions_tuple = tuple((x[1] for x in group))
                 action = actions_map[actions_tuple]
                 print(f'{key} {action}')
-            
-                future = tp.submit(self.upload, local_file)
-                futures.append(future)
+
+                if action == 'skip':
+                    continue
+                elif action == 'copy':
+                    local_file = join(local_root, key)
+                    future = tp.submit(self.upload2, local_file, key, local_root, s3_root)
+                    futures.append(future)
+                elif action == 'delete':
+                    to_del_key = f'{s3_root}{key}'
+                    print(f'what is to {to_del_key}')
+                    repl = f's3://{bucket}/'
+                    print(f'repl is {repl}')
+                    to_del_key = to_del_key.replace(repl, '')
+                    print(f'after replacing {to_del_key}')
+
+                    k = {'Key': to_del_key}
+                    print(k)
+                    to_delete_keys.append(k)
+                    if len(to_delete_keys) == 1000:
+                        future = tp.submit(self.s3_execute, 'delete_objects', {'Bucket': bucket, 'Delete': {'Objects': to_delete_keys}})
+                        futures.append(future)
+                        to_delete_keys = []
 
                 while len(futures) > 100:
                     done, notdone = wait(futures, None, FIRST_COMPLETED)
@@ -118,11 +159,25 @@ class S3ShutilEngine:
                         future.result() # so any exception throws is visible
                     futures = list(notdone)
 
-            done, notdone = wait(futures, None, ALL_COMPLETED)
-            assert len(notdone) == 0
-            for future in done:
-                future.result()
-
+            if to_delete_keys:
+                print(f'to delete keys {bucket} {to_delete_keys}')
+                future = tp.submit(self.s3_execute, 'delete_objects', {'Bucket': bucket, 'Delete': {'Objects': to_delete_keys}})
+                print('submitted')
+                done, notdone = wait([future], None, ALL_COMPLETED)
+                print(len(done))
+                assert len(notdone) == 0
+                for f in done:
+                    method, kwargs, r = f.result()
+                    print(f'done {method} {kwargs}')
+                    errors = r.get('Errors', [])
+                    print(errors)
+                    if errors:
+                        self.logger.error('%s errors', len(errors))
+                        for error in errors:
+                            self.logger.error('Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
+                                              error)
+                        raise Exception('Could not delete Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
+                                        errors[0])
         
 
     def execute_upload_multithreaded(self):
@@ -146,15 +201,6 @@ class S3ShutilEngine:
     def execute_upload(self):
         self.execute_upload_multithreaded()
 
-    def pre_download_file(self, Filename, **kwargs):
-        cleansed = self.cleanse_invalid_chars(Filename)
-        if cleansed != Filename:
-            self.logger.info('Cleaned %s to %s', Filename, cleansed)
-        directory = dirname(cleansed)
-        self.logger.info('Creating directory %s', directory)
-        makedirs(directory, 0o777, True)
-        kwargs['Filename'] = cleansed
-        return kwargs
 
     def to_components(self, path):
         drive, path = splitdrive(path)
@@ -163,6 +209,66 @@ class S3ShutilEngine:
             path, tail = split(path)
             r.insert(0, tail)
         return drive, r
+
+
+    def s3_execute(self, method, kwargs):
+        s3client = self.get_local_s3_client()
+        self.logger.info('Executing %s', method)
+        premethod = 'pre_%s' % method
+        if hasattr(self, premethod):
+            f = getattr(self, premethod)
+            kwargs = f(**kwargs)
+        f = getattr(s3client, method)
+        r = f(**kwargs)
+        return method, kwargs, r
+
+
+class BaseNode:
+
+    def set_engine(self, engine):
+        self.engine = engine
+
+    def configure(self):
+        pass
+
+    def bootstrap(self):
+        pass
+
+    def on_result(self, method, kwargs, result):
+        pass
+
+    def flush(self):
+        pass
+
+class S3toS3Copier(BaseNode):
+
+    def configure(self, src_bucket, src_root, dst_bucket, dst_root):
+        self.src_bucket = src_bucket
+        self.src_root = src_root
+        self.dst_bucket = dst_bucket
+        self.dst_root = dst_root
+
+    def on_result(self, method, kwargs, result):
+        if method != 'list_objects_v2':
+            return []
+
+        contents = result.get('Contents', [])
+        for entry in contents:
+            key = entry['Key']
+            relative = key.replace(self.src_root, '')
+            abs_dst = f'{self.dst_root}{relative}'
+            copy_source = {'Bucket': self.src_bucket, 'Key': key}
+            kwargs = {'Bucket': self.dst_bucket, 'Key': abs_dst, 'CopySource': copy_source}
+            self.engine.enqueue_method('copy_object', kwargs)
+        return []
+
+
+class S3Downloader(BaseNode):
+
+    def configure(self, bucket, s3_root, local_root):
+        self.bucket = bucket
+        self.s3_root = s3_root
+        self.local_root = local_root
 
     def cleanse_invalid_chars(self, path):
         if sys.platform == 'win32':
@@ -187,139 +293,161 @@ class S3ShutilEngine:
         else:
             return path
 
-    def s3_execute(self, method, kwargs):
-        s3client = self.get_local_s3_client()
-        self.logger.info('Executing %s', method)
-        premethod = 'pre_%s' % method
-        if hasattr(self, premethod):
-            f = getattr(self, premethod)
-            kwargs = f(**kwargs)
-        f = getattr(s3client, method)
+    def on_result(self, method, kwargs, result):
+        if method != 'list_objects_v2':
+            return []
+
+        for entry in result.get('Contents', []):
+            key = entry['Key']
+            relative = key.replace(self.s3_root, '')
+            parts = relative.split('/')
+            join_params = [self.local_root] + parts
+            local_file = join(*join_params)
+            kwargs = {'Bucket': self.bucket, 'Key': key, 'Filename': local_file}
+
+            cleansed = self.cleanse_invalid_chars(local_file)
+            if cleansed != local_file:
+                local_file = cleansed
+                kwargs['Filename'] = local_file
+
+
+            directory = dirname(local_file)
+            makedirs(directory, 0o777, True)
+
+            self.engine.enqueue_method('download_file', kwargs)
+
+        return []
+
+
+class S3Remover(BaseNode):
+
+    def configure(self, bucket):
+        self.bucket = bucket
+        self.to_delete = []
+
+    def flush(self):
+        if self.to_delete:
+            self.engine.enqueue_method('delete_objects', {'Bucket': self.bucket, 'Delete': {'Objects': self.to_delete}})
+            self.to_delete = []
+
+    def on_result(self, method, kwargs, result):
+        if method != 'list_objects_v2':
+            return []
+
+        contents = result.get('Contents', [])
+        for entry in contents:
+            key = entry['Key']
+
+            self.to_delete.append({'Key': key})
+            if len(self.to_delete) == 1000:
+                self.engine.enqueue_method('delete_objects', {'Bucket': self.bucket, 'Delete': {'Objects': self.to_delete}})
+                self.to_delete = []
+
+        return []
+
+
+class ListObjectsV2(BaseNode):
+
+    def configure(self, bucket, root, delimiter):
+        self.bucket = bucket
+        self.root = root
+        self.delimiter = delimiter
+
+    def bootstrap(self):
+        kwargs = {'Bucket': self.bucket, 'Prefix': self.root}
+        if self.delimiter is not None:
+            kwargs['Delimiter'] = self.delimiter
+        self.engine.enqueue_method('list_objects_v2', kwargs)
+
+    def on_result(self, method, kwargs, result):
+        if method != 'list_objects_v2':
+            return
+
+        if result['IsTruncated']:
+            token = result['NextContinuationToken']
+            kwargs = {'Bucket': self.bucket, 'Prefix': self.root, 'ContinuationToken': token}
+            self.engine.enqueue_method('list_objects_v2', kwargs)
+
+        prefixes = result.get('CommonPrefixes', [])
+        for prefix_obj in prefixes:
+            prefix = prefix_obj['Prefix']
+            kwargs = {'Bucket': self.bucket, 'Prefix': self.root, 'Prefix': prefix}
+            self.engine.enqueue_method('list_objects_v2', kwargs)
+
+        contents = result.get('Contents', [])
+        for entry in contents:
+            key = entry['Key']
+            yield key
+
+
+class Engine:
+
+    def __init__(self):
+        self.queue = []
+
+        self.workers = 25
+        self.max_queue_size = 100
+        self.thread_local = threading.local()
+
+        self.log = logging.getLogger('eng')
+
+    def enqueue_method(self, method_name, kwargs):
+        self.log.info('Enqueueing %s %s', method_name, kwargs)
+        self.queue.append((method_name, kwargs))
+
+    def get_s3_client(self):
+        client = getattr(self.thread_local, 's3', None)
+        if client is None:
+            client = boto3.Session().client('s3')
+            setattr(self.thread_local, 's3', client)
+        return client
+
+    def invoke_s3_method(self, method, kwargs):
+        self.log.info('Calling %s in thread %s', method, threading.get_native_id())
+        s3 = self.get_s3_client()
+        f = getattr(s3, method)
         r = f(**kwargs)
         return method, kwargs, r
 
-    def execute_download(self):
-        bucket, root = self.parse_s3_path(self.s3root)
-        to_do = [('list_objects_v2', {'Bucket': bucket, 'Prefix': root})]
+    def do_all(self, nodes):
+        self.log.info('do all')
+        for node in nodes:
+            node.set_engine(self)
+            node.bootstrap()
+
         futures = set()
-        with ThreadPoolExecutor(max_workers=25) as tp:
-            while to_do or futures:
-                if to_do and len(futures) < 100:
-                    method, kwargs = to_do.pop()
-                    future = tp.submit(self.s3_execute, method, kwargs)
+        with ThreadPoolExecutor(max_workers=self.workers) as tp:
+            while futures or self.queue:
+                self.log.info('Futures %s, queue %s, max_queue %s', len(futures), len(self.queue), self.max_queue_size)
+
+                while self.queue and len(futures) < self.max_queue_size:
+                    method, kwargs = self.queue.pop()
+                    future = tp.submit(self.invoke_s3_method, method, kwargs)
                     futures.add(future)
-                else:
-                    done, notdone = wait(futures, None, FIRST_COMPLETED)
-                    futures = notdone
-                    for future_done in done:
-                        method, kwargs, r = future_done.result()
-                        if method == 'list_objects_v2':
-                            if r['IsTruncated']:
-                                token = r['NextContinuationToken']
-                                kwargs = {'Bucket': bucket, 'Prefix': root, 'ContinuationToken': token}
-                                to_do.append(('list_objects_v2', kwargs))
 
-                            if r['Contents']:
-                                for entry in r['Contents']:
-                                    key = entry['Key']
-                                    relative = key.replace(root, '')
-                                    parts = relative.split('/')
-                                    join_params = [self.localroot] + parts
-                                    local_file = join(*join_params)
-                                    self.logger.info('Download to %s', local_file)
-                                    to_do.append(('download_file', {'Bucket': bucket, 'Key': key, 'Filename': local_file}))
-
-    def execute_s3_to_s3_copy(self, src, dst):
-        bucket, root = self.parse_s3_path(src)
-        dst_bucket, dst_prefix = self.parse_s3_path(dst)
-        to_do = [('list_objects_v2', {'Bucket': bucket, 'Prefix': root})]
-        futures = set()
-        with ThreadPoolExecutor(max_workers=25) as tp:
-            while to_do or futures:
-                if to_do and len(futures) < 100:
-                    method, kwargs = to_do.pop()
-                    future = tp.submit(self.s3_execute, method, kwargs)
-                    futures.add(future)
-                else:
-                    done, notdone = wait(futures, None, FIRST_COMPLETED)
-                    futures = notdone
-                    for future_done in done:
-                        method, kwargs, r = future_done.result()
-                        if method == 'list_objects_v2':
-                            if r['IsTruncated']:
-                                token = r['NextContinuationToken']
-                                kwargs = {'Bucket': bucket, 'Prefix': root, 'ContinuationToken': token}
-                                to_do.append(('list_objects_v2', kwargs))
-
-                            if r['Contents']:
-                                for entry in r['Contents']:
-                                    key = entry['Key']
-                                    relative = key.replace(root, '')
-                                    abs_dst = f'{dst_prefix}{relative}'
-                                    self.logger.info('Copy to %s:%s to %s:%s', bucket, key, dst_bucket, abs_dst)
-                                    copy_source = {'Bucket': bucket, 'Key': key}
-                                    to_do.append(('copy_object', {'Bucket': dst_bucket, 'Key': abs_dst, 'CopySource': copy_source}))
-
-    def execute_sync(self, source, dest):
-        src_s3 = source.startswith('s3://')
-        dst_s3 = dest.startswith('s3://')
-
-        
-
-    def execute_rmtree(self):
-        bucket, root = self.parse_s3_path(self.s3root)
-        to_do = [('list_objects_v2', {'Bucket': bucket, 'Prefix': root})]
-        to_delete_keys = []
-        futures = set()
-        with ThreadPoolExecutor(max_workers=25) as tp:
-            while to_do or futures:
-                if to_do and len(futures) < 100:
-                    method, kwargs = to_do.pop()
-                    future = tp.submit(self.s3_execute, method, kwargs)
-                    futures.add(future)
-                else:
-                    done, notdone = wait(futures, None, FIRST_COMPLETED)
-                    futures = notdone
-                    for future_done in done:
-                        method, kwargs, r = future_done.result()
-                        if method == 'list_objects_v2':
-                            if r['IsTruncated']:
-                                token = r['NextContinuationToken']
-                                kwargs = {'Bucket': bucket, 'Prefix': root, 'ContinuationToken': token}
-                                to_do.append(('list_objects_v2', kwargs))
-
-                            entries = r.get('Contents', [])
-                            for entry in entries:
-                                to_delete_keys.append({'Key': entry['Key']})
-                                if len(to_delete_keys) == 1000:
-                                    to_do.append(('delete_objects', {'Bucket': bucket, 'Delete': {'Objects': to_delete_keys}}))
-                                    to_delete_keys = []
-                        elif method == 'delete_objects':
-                            errors = r.get('Errors', [])
-                            if errors:
-                                self.logger.error('%s errors', len(errors))
-                                for error in errors:
-                                    self.logger.error('Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
-                                        error)
-                                raise Exception('Could not delete Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
-                                        errors[0])
-
-
-            if to_delete_keys:
-                future = tp.submit(self.s3_execute, 'delete_objects', {'Bucket': bucket, 'Delete': {'Objects': to_delete_keys}})
-                done, notdone = wait([future], None, ALL_COMPLETED)
-                assert len(notdone) == 0
+                done, futures = wait(futures, None, FIRST_COMPLETED)
                 for f in done:
                     method, kwargs, r = f.result()
-                    errors = r.get('Errors', [])
-                    if errors:
-                        self.logger.error('%s errors', len(errors))
-                        for error in errors:
-                            self.logger.error('Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
-                                error)
-                        raise Exception('Could not delete Key: %(Key)s, VersionId: %(VersionId)s, Code: %(Code)s, Message: %(Message)s',
-                                errors[0])
+                    for node in nodes:
+                        for x in node.on_result(method, kwargs, r):
+                            yield x
 
+            self.log.info('Before flushing, queue size is %s, futures %s', len(self.queue), len(futures))
+            for node in nodes:
+                node.flush()
+
+            self.log.info('After flushing, queue size is %s, futures %s', len(self.queue), len(futures))
+            while self.queue:
+                method, kwargs = self.queue.pop()
+                future = tp.submit(self.invoke_s3_method, method, kwargs)
+                futures.add(future)
+
+            done, futures = wait(futures, None, FIRST_COMPLETED)
+            for f in done:
+                method, kwargs, r = f.result()
+                for node in nodes:
+                    for x in node.on_result(method, kwargs, r):
+                        yield x
 
 
 
@@ -333,12 +461,36 @@ def _copytree_local_to_s3(src, dst):
     s3sh.execute_upload()
 
 def _copytree_s3_to_local(src, dst):
-    s3sh = S3ShutilEngine(s3root=src, localroot=dst)
-    s3sh.execute_download()
+    src_bucket, src_prefix = parse_s3_path(src)
+
+    eng = Engine()
+    list_obj = ListObjectsV2()
+
+    list_obj.configure(src_bucket, src_prefix, None)
+    list_obj.set_engine(eng)
+
+    s3 = S3Downloader()
+    s3.configure(src_bucket, src_prefix, dst)
+    s3.set_engine(eng)
+
+    list(eng.do_all([list_obj, s3]))
 
 def _copy_s3_to_s3(src, dst):
-    s3sh = S3ShutilEngine(s3root=src, localroot=dst)
-    s3sh.execute_s3_to_s3_copy(src, dst)
+    src_bucket, src_prefix = parse_s3_path(src)
+    dst_bucket, dst_prefix = parse_s3_path(dst)
+
+    eng = Engine()
+    list_obj = ListObjectsV2()
+
+    list_obj.configure(src_bucket, src_prefix, None)
+    list_obj.set_engine(eng)
+
+    s3 = S3toS3Copier()
+    s3.configure(src_bucket, src_prefix, dst_bucket, dst_prefix)
+    s3.set_engine(eng)
+
+    list(eng.do_all([list_obj, s3]))
+
 
 def copytree(src, dst):
     is_s3_src = _is_s3(src)
@@ -358,8 +510,18 @@ def rmtree(src):
     if not _is_s3(src):
         raise Exception(f'Path {src} must start with s3://')
 
-    s3sh = S3ShutilEngine(None, src)
-    s3sh.execute_rmtree()
+    src_bucket, src_prefix = parse_s3_path(src)
+
+    eng = Engine()
+    rm = S3Remover()
+    rm.configure(src_bucket)
+    rm.set_engine(eng)
+
+    list_obj = ListObjectsV2()
+    list_obj.configure(src_bucket, src_prefix, None)
+    list_obj.set_engine(eng)
+
+    list(eng.do_all([list_obj, rm]))
 
 
 def move(src, dst):

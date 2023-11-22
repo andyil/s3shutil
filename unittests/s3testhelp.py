@@ -59,6 +59,7 @@ class S3TestHelp:
         contents = r.get('Contents', [])
         for elem in contents:            
             key = elem['Key']
+            print(f'key--> {key}')
             r = s3.get_object(Bucket=bucket, Key=key)
             text = r['Body'].read()
             head_100 = text[:100]
@@ -72,6 +73,8 @@ class S3TestHelp:
     def fs_root_to_json(self, root):
         all_files = []
         for dir, dirs, files in os.walk(root):
+            dirs.sort()
+            files.sort()
             for file in files:
                 print(file)
                 fp = os.path.join(dir, file)
