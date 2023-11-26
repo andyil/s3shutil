@@ -7,10 +7,15 @@ import shutil
 import deepdiff
 import os
 import random
+import logging
+import sys
 
-print('Get caller identity')
+eng = logging.getLogger('eng')
+logging.getLogger().setLevel(logging.WARN)
+eng.setLevel(logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, format='%(levelname)s:%(threadName)s:%(message)s')
+
 caller = boto3.client('sts').get_caller_identity()
-print(caller)
 
 class TestS3Shutil(unittest.TestCase):
 
@@ -24,9 +29,9 @@ class TestS3Shutil(unittest.TestCase):
         self.maxDiff = None
         
     
-    def assertObjEq(self, o1, o2):
+    def assertObjEq(self, o1, o2, msg=None):
         jsondiff = deepdiff.DeepDiff(o1, o2).to_json()
-        self.assertEqual(jsondiff, '{}')
+        self.assertEqual(jsondiff, '{}', msg)
 
     def write(self, path, body=None):
         if body is None:
@@ -39,7 +44,7 @@ class TestS3Shutil(unittest.TestCase):
         with open(path, mode) as f:
             f.write(body)
 
-    def tearDown(self):                
+    def tearDown(self):
         shutil.rmtree(self.fsroot1)
         shutil.rmtree(self.fsroot2)       
         s3shutil.rmtree(self.s3root1)
@@ -107,7 +112,49 @@ class TestS3Shutil(unittest.TestCase):
         j3 = self.s3th.fs_root_to_json(self.fsroot2)
         self.assertObjEq(j1, j2)
         self.assertObjEq(j1, j3)
-       
+
+    def test_local_sync_to_s3_no_changes(self):
+        self.populate1()      
+        s3shutil.copytree(self.fsroot1, self.s3root1)
+
+        s3shutil.upload_sync(self.fsroot1, self.s3root1)
+
+        j1 = self.s3th.s3_root_to_json(self.s3root1)
+        j2 = self.s3th.fs_root_to_json(self.fsroot1)
+
+        self.assertObjEq(j2, j1)
+
+    def test_local_sync_to_s3_only_upload(self):
+        self.populate1()
+        s3shutil.copytree(self.fsroot1, self.s3root1)
+
+        p = f'{self.s3root1}d3/d5/x'
+        s3shutil.rmtree(p)
+
+        s3shutil.upload_sync(self.fsroot1, self.s3root1)
+
+        j1 = self.s3th.s3_root_to_json(self.s3root1)
+        j2 = self.s3th.fs_root_to_json(self.fsroot1)
+
+        self.assertObjEq(j2, j1)
+
+    def test_local_sync_to_s3_only_delete(self):
+        self.populate1()
+        s3shutil.copytree(self.fsroot1, self.s3root1)
+
+        delete_locally = os.path.join(self.fsroot1, 'd2', 'd')
+        os.unlink(delete_locally)
+
+        s3shutil.upload_sync(self.fsroot1, self.s3root1)
+
+        j1 = self.s3th.fs_root_to_json(self.fsroot1)
+        j2 = self.s3th.s3_root_to_json(self.s3root1)
+
+        l1 = list(map(lambda x: x['Key'], j1))
+        l2 = list(map(lambda x: x['Key'], j2))
+
+        self.assertObjEq(l1, l2)
+
 
     def test_rmtree(self):
         self.populate1()      
@@ -140,16 +187,21 @@ class TestS3Shutil(unittest.TestCase):
 
     def test_move_s3_to_fs(self):
         self.populate1()
-        s3shutil.copytree(self.fsroot1, self.s3root1)
-        s3shutil.move(self.s3root1, self.fsroot2)
 
-        j0 = self.s3th.fs_root_to_json(self.fsroot1)        
-        j1 = self.s3th.s3_root_to_json(self.s3root1)
-        j2 = self.s3th.fs_root_to_json(self.fsroot2)
+        creation = self.fsroot1
+        s3_src = self.s3root1
+        fs_dest = self.fsroot2
 
-        self.assertObjEq(j1, [])
+        s3shutil.copytree(creation, s3_src)
+        s3shutil.move(s3_src, fs_dest)
 
-        self.assertObjEq(j0, j2)
+        creation_list = self.s3th.fs_root_to_json(creation)
+        src_list = self.s3th.s3_root_to_json(s3_src)
+        dest_list = self.s3th.fs_root_to_json(fs_dest)
+
+        self.assertObjEq(src_list, [], 'move src in s3 should be empty')
+
+        self.assertObjEq(creation_list, dest_list, 'move dest should be same as creation')
 
     def test_move_s3_to_s3(self):
         self.populate1()
