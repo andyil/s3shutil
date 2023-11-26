@@ -12,6 +12,20 @@ import shutil
 
 log = logging.getLogger('eng')
 
+try:
+    from itertools import batched as itertools_batched
+except:
+    def itertools_batched(it, batch_size):
+        current_batch = []
+        for x in it:
+            current_batch.append(x)
+            if len(current_batch) == batch_size:
+                yield current_batch
+                current_batch = []
+
+        if current_batch:
+            yield current_batch
+
 def parse_s3_path(s3path):
     """"returns a (bucket, fullpath) tuple from a s3://bucket/path/to/key string"""
     assert s3path[:5] == 's3://'
@@ -166,7 +180,7 @@ class Engine:
         deletes = filter(lambda x:x[1] == 'delete', t2)
         delete_keys = map(lambda x:x[0], deletes)
         del_keys_rel_to_root = map(lambda x: f'{dest_prefix}{x}', delete_keys)
-        batched_dels = itertools.batched(del_keys_rel_to_root, 1000)
+        batched_dels = itertools_batched(del_keys_rel_to_root, 1000)
         batched_dels_args = map(lambda x: (dest_bucket, x), batched_dels)
 
         with self.tp() as tp:
@@ -188,7 +202,7 @@ class Engine:
 
     def delete_s3_tree(self, s3_bucket, s3_prefix):
         keys = self._list_keys(s3_bucket, s3_prefix)
-        batched = itertools.batched(keys, 1000)
+        batched = itertools_batched(keys, 1000)
         params = map(lambda x: (s3_bucket, x), batched)
 
         self.map_and_collect(self._delete_keys, params)
