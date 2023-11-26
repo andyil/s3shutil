@@ -1,5 +1,10 @@
+<<<<<<< Updated upstream
 from os.path import join, relpath, sep, dirname, splitdrive, split
 from os import walk, makedirs
+=======
+from os.path import join, relpath, sep, dirname, splitdrive, split, unlink
+from os import walk, makedirs, stat, sep
+>>>>>>> Stashed changes
 import logging
 from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED, FIRST_COMPLETED
 import threading
@@ -51,17 +56,144 @@ class S3ShutilEngine:
         bucket, key = self.parse_s3_path(s3_path)
         s3client.upload_file(localfile, bucket, key)
 
+_thread_local_boto3_singleton = None
+
+def get_thread_local_boto3():
+    global _thread_local_boto3_singleton
+    if _thread_local_boto3_singleton is None:
+        _thread_local_boto3_singleton = ThreadLocalBoto3()
+
+    return _thread_local_boto3_singleton
+
+
+class GenericPath:
+
+    def enumerate_keys(self, root):
+        pass
+
+    def delete(self, key):
+        pass
+
+    def relative(self, path, start):
+        pass
+
+    def join(self, root, relative):
+        pass
+
+    def delete_batch_size(self):
+        return 1
+
+class FsPath(GenericPath):
+    """valid objects are strings"""
+
+    def enumerate_keys(self, root):
+        for directory, dirs, files in walk(root):
+            if True:
+                dirs.sort()
+                files.sort()
+            for file in files:
+                fp = join(directory, file)
+                if False:
+                    s = stat(fp)
+                    last_modified = s.st_mtime
+                    sz = s.st_size
+                    yield (fp, last_modified, sz)
+                else:
+                    yield fp
+
+    def delete(self, keys):
+        for key in keys:
+            unlink(key)
+
+    def relative(self, path, start):
+        return relpath(path, start)
+
+    def join(self, root, relative):
+        return join(root, relative)
+
+    def delete_batch_size(self):
+        return 1
+
+class S3Path(GenericPath):
+    """valid objects are tuples (key, value) or (key, prefix)"""
+
+    def __init__(self):
+        self.s3 = get_thread_local_boto3()
+
+    def enumerate_keys(self, root):
+        bucket, prefix = root
+        s3 = self.b3.client('s3')
+        paginator = s3.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            content = page.get('Contents', [])
+            for item in content:
+                k = item['Key']
+                log.info('Detected key %s', k)
+                yield (bucket, k)
+
+    def delete(self, keys):
+        keys = [{'Key': k[1]} for k in keys]
+        bucket = keys[0][0]
+        s3 = self.b3.client('s3')
+        s3.delete_objects(Bucket=bucket, Delete={'Objects': keys})
+
+    def relative(self, path, start):
+        b1, p1 = path
+        b2, p2 = start
+        relative_path = p1.replace(p2, '')
+        assert b1, relative_path
+
+        return relpath(path, start)
+
+    def join(self, root, relative):
+        b1, p1 = root
+        b2, p2 = relative
+        joined = f'{p1}{p2}'
+        assert b1 == b2
+        return b1, joined
+
+    def delete_batch_size(self):
+        return 1000
+
+class GenericCopier:
+
+    def __init__(self):
+        self.b3 = get_thread_local_boto3()
+
+    def generic_copy(self, src, dst):
+        s3 = self.boto3.client('s3')
+        if type(src) == str:
+            if type(dst) == tuple: #local to s3
+                full_path = src
+                bucket, key = dst
+                return s3.upload(full_path, bucket, key)
+        elif type(src) == tuple:
+            src_bucket, src_key = src
+            if type(dst) == tuple: #s3 to s3
+                dst_bucket, dst_key = dst
+                copy_src = {'Bucket': src_bucket, 'Key': src_key}
+                return s3.copy_object(Bucket=dst_bucket, Key=dst_key, CopySource=copy_src)
+            elif type(dst) == str:
+                return s3.download_file(src_bucket, src_key, dst)
+
+        raise Exception('unsupported')
+
 
     def execute_upload_synch(self):
         for local_file in self.enumerate_local(self.localroot):
             self.upload(local_file)
 
+<<<<<<< Updated upstream
     def execute_upload_multithreaded(self):
         futures = []
         with ThreadPoolExecutor(max_workers=25) as tp:
             for local_file in self.enumerate_local(self.localroot):
                 future = tp.submit(self.upload, local_file)
                 futures.append(future)
+=======
+    def __init__(self):
+        self.b3 = get_thread_local_boto3()
+>>>>>>> Stashed changes
 
                 while len(futures) > 100:
                     done, notdone = wait(futures, None, FIRST_COMPLETED)
