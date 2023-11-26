@@ -1,1 +1,1 @@
-from s3shutil.s3shutil import copytree, rmtree, move
+from s3shutil.s3shutil import copytree, rmtree, move, upload_sync

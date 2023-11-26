@@ -31,7 +31,6 @@ class S3TestHelp:
 
         rand = secrets.token_urlsafe(8)
         name = f'{self.prefix}{rand}'.lower()
-        print(name)
         s3.create_bucket(Bucket=name, CreateBucketConfiguration={'LocationConstraint': self.region_name})
 
         return name
@@ -59,7 +58,6 @@ class S3TestHelp:
         contents = r.get('Contents', [])
         for elem in contents:            
             key = elem['Key']
-            print(f'key--> {key}')
             r = s3.get_object(Bucket=bucket, Key=key)
             text = r['Body'].read()
             head_100 = text[:100]
@@ -76,7 +74,6 @@ class S3TestHelp:
             dirs.sort()
             files.sort()
             for file in files:
-                print(file)
                 fp = os.path.join(dir, file)
                 rel = os.path.relpath(fp, root)
 
