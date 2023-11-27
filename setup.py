@@ -6,7 +6,7 @@ setup(
 
   long_description=open('README.rst').read(),
   long_description_content_type='text/x-rst',
-  version = '0.34',
+  version = '0.35',
   license='MIT',
   description = 'A shutil like interface to AWS S3',
   url = 'https://github.com/andyil/s3shutil',
