@@ -12,7 +12,7 @@ import sys
 
 eng = logging.getLogger('eng')
 logging.getLogger().setLevel(logging.WARN)
-eng.setLevel(logging.DEBUG)
+eng.setLevel(logging.INFO)
 logging.basicConfig(stream=sys.stdout, format='%(levelname)s:%(threadName)s:%(message)s')
 
 caller = boto3.client('sts').get_caller_identity()
@@ -21,8 +21,8 @@ class TestS3Shutil(unittest.TestCase):
 
     def setUp(self):
         self.s3th = s3testhelp.S3TestHelp()
-        self.fsroot1 = tempfile.mkdtemp()
-        self.fsroot2 = tempfile.mkdtemp()
+        self.fsroot1 = tempfile.mkdtemp(suffix='-fsroot1', prefix='s3shutil-')
+        self.fsroot2 = tempfile.mkdtemp(suffix='-fsroot2', prefix='s3shutil-')
         self.s3root1 = self.s3th.get_tests_root()
         self.s3root2 = self.s3th.get_tests_root()
 
@@ -62,7 +62,7 @@ class TestS3Shutil(unittest.TestCase):
         os.mkdir(has_files)
 
         for d in 'x', 'y', 'z':
-            fp = os.path.join(has_files, 'd')
+            fp = os.path.join(has_files, d)
             self.write(fp)
 
 
@@ -116,8 +116,7 @@ class TestS3Shutil(unittest.TestCase):
     def test_local_sync_to_s3_no_changes(self):
         self.populate1()      
         s3shutil.copytree(self.fsroot1, self.s3root1)
-
-        s3shutil.upload_sync(self.fsroot1, self.s3root1)
+        s3shutil.tree_sync(self.fsroot1, self.s3root1)
 
         j1 = self.s3th.s3_root_to_json(self.s3root1)
         j2 = self.s3th.fs_root_to_json(self.fsroot1)
@@ -131,7 +130,7 @@ class TestS3Shutil(unittest.TestCase):
         p = f'{self.s3root1}d3/d5/x'
         s3shutil.rmtree(p)
 
-        s3shutil.upload_sync(self.fsroot1, self.s3root1)
+        s3shutil.tree_sync(self.fsroot1, self.s3root1)
 
         j1 = self.s3th.s3_root_to_json(self.s3root1)
         j2 = self.s3th.fs_root_to_json(self.fsroot1)
@@ -142,10 +141,10 @@ class TestS3Shutil(unittest.TestCase):
         self.populate1()
         s3shutil.copytree(self.fsroot1, self.s3root1)
 
-        delete_locally = os.path.join(self.fsroot1, 'd2', 'd')
+        delete_locally = os.path.join(self.fsroot1, 'd2', 'y')
         os.unlink(delete_locally)
 
-        s3shutil.upload_sync(self.fsroot1, self.s3root1)
+        s3shutil.tree_sync(self.fsroot1, self.s3root1)
 
         j1 = self.s3th.fs_root_to_json(self.fsroot1)
         j2 = self.s3th.s3_root_to_json(self.s3root1)
