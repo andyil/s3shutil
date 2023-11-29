@@ -31,7 +31,6 @@ class S3TestHelp:
 
         rand = secrets.token_urlsafe(8)
         name = f'{self.prefix}{rand}'.lower()
-        print(name)
         s3.create_bucket(Bucket=name, CreateBucketConfiguration={'LocationConstraint': self.region_name})
 
         return name
@@ -72,8 +71,9 @@ class S3TestHelp:
     def fs_root_to_json(self, root):
         all_files = []
         for dir, dirs, files in os.walk(root):
+            dirs.sort()
+            files.sort()
             for file in files:
-                print(file)
                 fp = os.path.join(dir, file)
                 rel = os.path.relpath(fp, root)
 
