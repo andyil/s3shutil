@@ -30,11 +30,11 @@ We recommend installing from the official PyPI repository.
 
 Design Principles
 ~~~~~~~~~~~~~~~~~
-* Expose a simple and intuitive string based API. 
-* Where possible, emulate the well known `shutil <https://docs.python.org/3/library/shutil.html>`_ standard module API.
-* Use multithreading behind the scenes for performance.
-* Internally use batch APIs where available (deleting objects).
-* Internally use server to server APIs where possible (copy between s3 to s3).
+* A simple and intuitive string based API.
+* Expose powerful one-liners.
+* Emulate the well known `shutil <https://docs.python.org/3/library/shutil.html>`_ standard module API.
+* Use performance boosts behind the scenes (multithreading, batching, server to server operations)
+* No dependencies, where possible
 
 
 Using s3shutil
@@ -43,38 +43,53 @@ s3shutil uses `boto3 <https://github.com/boto/boto3>`_ internally and we assume 
 
 Using s3shutil is super easy:
 
-**Download a directory tree from s3**:
+**Import is mandatory, and then you can do powerful things with a single line of code**:
+
+.. code-block:: python
+
+    import s3shutil
+
+**Download a directory tree from s3:**:
 
 .. code-block:: python
     
-    import s3shutil
     s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/')
 
-**Upload a directory tree to s3.**
+**Upload a directory tree to s3:**
 
 Just replace the order of the arguments, as you probably expected.
 
 .. code-block:: python
 
-    import s3shutil
     s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/')
 
-**Copy a directory tree from s3 to another location in s3.**
+**Copy a directory tree from s3 to another location in s3:**
 
-Supports same or different bucket.
 
 s3shutil will notice and use server to server (s3 object copy) for you.
 
 .. code-block:: python
 
-    import s3shutil
     s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/')
 
-**Delete multiple files from s3.**
+**Delete multiple files from s3:**
 
 s3shutil will notice and internally use batch delete.
 
 .. code-block:: python
 
-    import s3shutil
     s3shutil.rmtree('s3://bucket/my-files/documents/')
+
+
+**Just released! (December 2023), tree_sync operation:**
+
+tree_sync will copy the missing files and remove the extra files from destination.
+This can save you a lot of time and bandwidth.
+Work seamlessly and transparently in all directions (disk to s3, s3 to disk, s3 to s3)
+
+.. code-block:: python
+
+    s3shutil.tree_sync('s3://bucket/my-files/documents/', '/home/myuser/documents')
+    s3shutil.tree_sync('/home/myuser/documents', 's3://bucket/my-files/documents/')
+    s3shutil.tree_sync('s3://bucket/my-files/documents/', 's3://another-bucket/a/b/c')
+
