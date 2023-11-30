@@ -109,5 +109,5 @@ Contact
 ~~~~~~~~~~~~~~
 Just use it! You are also invited to send an email `andyworms@gmail.com`.
 All emails are (eventually) answered.
-Read the code, fork, open a PR, start a discussion.
+Also read the code, fork, open a PR, start a discussion.
 
