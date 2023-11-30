@@ -6,7 +6,7 @@ setup(
 
   long_description=open('README.rst').read(),
   long_description_content_type='text/x-rst',
-  version = '0.35',
+  version='0.36',
   license='MIT',
   description = 'Easy pythonic API to copy and sync to and from s3',
   url = 'https://github.com/andyil/s3shutil',
