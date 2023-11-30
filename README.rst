@@ -105,3 +105,9 @@ Conclusions
 s3shutil will notice alone if the location is s3 (starts with s3://) or not
 All operations have a similar string based API of powerfull one liners
 
+Contact
+~~~~~~~~~~~~~~
+Just use it! You are also invited to send an email `andyworms@g mail.com <https://github.com/boto/boto3>`.
+All emails are eventually answered.
+Read the code, fork, open a PR, start a discussion.
+
