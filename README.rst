@@ -1,5 +1,5 @@
 ===================================================
-The easiest way to manipulate multiple files in s3
+Super easy copy, move, delete, and sync s3 files
 ===================================================
 |Unittests| |License| |Downloads| |Language|
 
@@ -15,6 +15,15 @@ The easiest way to manipulate multiple files in s3
 
 s3shutil is the easiest to use and fastest way of manipulating directory files in s3,
 probably at the expense of hiding API details you don't usually care.
+
+
+.. note::
+   December 1st, 2023. Just released sync operation
+
+   Sync operation allows you to incrementally copy to destination files that
+   were added to source since the last copy
+   Supports all directions: s3 to s3, s3 to local drive, local drive to s3.
+
 
 Installation
 ---------------
@@ -43,53 +52,40 @@ s3shutil uses `boto3 <https://github.com/boto/boto3>`_ internally and we assume 
 
 Using s3shutil is super easy:
 
-**Import is mandatory, and then you can do powerful things with a single line of code**:
+**Import is mandatory, no suprises here**:
 
 .. code-block:: python
 
     import s3shutil
 
-**Download a directory tree from s3:**:
+**Then you can do powerful things with simple one liners:**:
 
 .. code-block:: python
     
-    s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/')
+    s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/') # downloads a tree from s3
 
-**Upload a directory tree to s3:**
+    s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/') # uploads a tree to s3
 
-Just replace the order of the arguments, as you probably expected.
+    s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/') #copy between two s3 locations
+                                                                                                     # same or different bucket
 
-.. code-block:: python
-
-    s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/')
-
-**Copy a directory tree from s3 to another location in s3:**
-
-
-s3shutil will notice and use server to server (s3 object copy) for you.
-
-.. code-block:: python
-
-    s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/')
-
-**Delete multiple files from s3:**
-
-s3shutil will notice and internally use batch delete.
-
-.. code-block:: python
-
-    s3shutil.rmtree('s3://bucket/my-files/documents/')
+    s3shutil.rmtree('s3://bucket/my-files/documents/') # deleete (recursively) entire prefix
 
 
 **Just released! (December 2023), tree_sync operation:**
 
-tree_sync will copy the missing files and remove the extra files from destination.
-This can save you a lot of time and bandwidth.
-Work seamlessly and transparently in all directions (disk to s3, s3 to disk, s3 to s3)
+
 
 .. code-block:: python
 
-    s3shutil.tree_sync('s3://bucket/my-files/documents/', '/home/myuser/documents')
-    s3shutil.tree_sync('/home/myuser/documents', 's3://bucket/my-files/documents/')
-    s3shutil.tree_sync('s3://bucket/my-files/documents/', 's3://another-bucket/a/b/c')
+    s3shutil.tree_sync('s3://bucket/my-files/documents/', '/home/myuser/documents') # sync download
+    s3shutil.tree_sync('/home/myuser/documents', 's3://bucket/my-files/documents/') # sync upload
+    s3shutil.tree_sync('s3://bucket/my-files/documents/', 's3://another-bucket/a/b/c') # sync two bucket locations
+
+
+
+Conclusions
+~~~~~~~~~~~~~~
+s3shutil will notice alone if the location is s3 (starts with s3://) or not
+All operations have a similar string based API of powerfull one liners
 
