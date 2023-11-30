@@ -1,5 +1,5 @@
 ===================================================
-Easy pythonic API to copy and sync to/from s3
+Easy pythonic API to copy and sync to and from s3
 ===================================================
 |Unittests| |License| |Downloads| |Language|
 
