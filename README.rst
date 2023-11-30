@@ -61,15 +61,22 @@ Using s3shutil is super easy:
 **Then you can do powerful things with simple one liners:**:
 
 .. code-block:: python
-    
-    s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/') # downloads a tree from s3
 
-    s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/') # uploads a tree to s3
+    # downloads a tree from s3
+    s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/')
 
-    s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/') #copy between two s3 locations
-                                                                                                     # same or different bucket
 
-    s3shutil.rmtree('s3://bucket/my-files/documents/') # deleete (recursively) entire prefix
+    # uploads a tree to s3
+    s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/')
+
+
+    #copy between two s3 locations
+    # same or different bucket
+    s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/')
+
+
+    # delete (recursively) entire prefix
+    s3shutil.rmtree('s3://bucket/my-files/documents/')
 
 
 **Just released! (December 2023), tree_sync operation:**
@@ -78,9 +85,16 @@ Using s3shutil is super easy:
 
 .. code-block:: python
 
-    s3shutil.tree_sync('s3://bucket/my-files/documents/', '/home/myuser/documents') # sync download
-    s3shutil.tree_sync('/home/myuser/documents', 's3://bucket/my-files/documents/') # sync upload
-    s3shutil.tree_sync('s3://bucket/my-files/documents/', 's3://another-bucket/a/b/c') # sync two bucket locations
+    # sync download
+    s3shutil.tree_sync('s3://bucket/my-files/documents/', '/home/myuser/documents')
+
+    
+    # sync upload
+    s3shutil.tree_sync('/home/myuser/documents', 's3://bucket/my-files/documents/')
+
+
+    # sync two bucket locations
+    s3shutil.tree_sync('s3://bucket/my-files/documents/', 's3://another-bucket/a/b/c')
 
 
 
