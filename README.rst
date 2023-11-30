@@ -62,15 +62,15 @@ Using s3shutil is super easy:
 
 .. code-block:: python
 
-    # downloads a tree from s3
+    # download a tree from s3
     s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/')
 
 
-    # uploads a tree to s3
+    # upload a tree to s3
     s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/')
 
 
-    #copy between two s3 locations
+    # copy between two s3 locations
     # same or different bucket
     s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/')
 
@@ -81,6 +81,8 @@ Using s3shutil is super easy:
 
 **Just released! (December 2023), tree_sync operation:**
 
+Only copies files that are missing in the destination.
+Also deletes extra files.
 
 
 .. code-block:: python
@@ -88,7 +90,7 @@ Using s3shutil is super easy:
     # sync download
     s3shutil.tree_sync('s3://bucket/my-files/documents/', '/home/myuser/documents')
 
-    
+
     # sync upload
     s3shutil.tree_sync('/home/myuser/documents', 's3://bucket/my-files/documents/')
 
