@@ -8,7 +8,7 @@ setup(
   long_description_content_type='text/x-rst',
   version = '0.35',
   license='MIT',
-  description = 'A shutil like interface to AWS S3',
+  description = 'Easy pythonic API to copy and sync to/from s3',
   url = 'https://github.com/andyil/s3shutil',
   download_url = 'https://github.com/andyil/s3shutil/archive/0.28.tar.gz',
   keywords = ['aws', 's3', 'cloud', 'storage', 'shutil', 'network'],

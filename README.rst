@@ -1,5 +1,5 @@
 ===================================================
-Super easy copy, move, delete, and sync s3 files
+Easy pythonic API to copy and sync to/from s3
 ===================================================
 |Unittests| |License| |Downloads| |Language|
 
