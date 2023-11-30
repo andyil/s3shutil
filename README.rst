@@ -1,5 +1,5 @@
 ===================================================
-The easiest way to manipulate multiple files in s3
+Python library to copy, sync and move files to and from s3
 ===================================================
 |Unittests| |License| |Downloads| |Language|
 
@@ -13,8 +13,16 @@ The easiest way to manipulate multiple files in s3
 
 .. |Language| image:: https://img.shields.io/github/languages/top/andyil/s3shutil
 
-s3shutil is the easiest to use and fastest way of manipulating directory files in s3,
-probably at the expense of hiding API details you don't usually care.
+**s3shutil is the easiest to use and fastest way of moving around directories and files in s3.**
+
+
+.. note::
+   December 1st, 2023. Just released sync operation
+
+   Sync operation allows you to incrementally copy to destination files that
+   were added to source since the last copy
+   Supports all directions: s3 to s3, s3 to local drive, local drive to s3.
+
 
 Installation
 ---------------
@@ -30,11 +38,12 @@ We recommend installing from the official PyPI repository.
 
 Design Principles
 ~~~~~~~~~~~~~~~~~
-* Expose a simple and intuitive string based API. 
-* Where possible, emulate the well known `shutil <https://docs.python.org/3/library/shutil.html>`_ standard module API.
-* Use multithreading behind the scenes for performance.
-* Internally use batch APIs where available (deleting objects).
-* Internally use server to server APIs where possible (copy between s3 to s3).
+* A simple and intuitive string based API.
+* Symmetric API: download and uploads work equally
+* Exposes powerful and performant one-liners.
+* Emulate the well known `shutil <https://docs.python.org/3/library/shutil.html>`_ standard module API.
+* Use performance boosts behind the scenes (multithreading, batching, server to server operations)
+* No dependencies except boto3
 
 
 Using s3shutil
@@ -43,38 +52,56 @@ s3shutil uses `boto3 <https://github.com/boto/boto3>`_ internally and we assume 
 
 Using s3shutil is super easy:
 
-**Download a directory tree from s3**:
+**Import is mandatory, no suprises here**:
 
 .. code-block:: python
-    
+
     import s3shutil
+
+**Then you can do powerful things with simple one liners:**:
+
+.. code-block:: python
+
+    # download a tree from s3
     s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/')
 
-**Upload a directory tree to s3.**
-
-Just replace the order of the arguments, as you probably expected.
-
-.. code-block:: python
-
-    import s3shutil
+    # upload a tree to s3
     s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/')
 
-**Copy a directory tree from s3 to another location in s3.**
-
-Supports same or different bucket.
-
-s3shutil will notice and use server to server (s3 object copy) for you.
-
-.. code-block:: python
-
-    import s3shutil
+    # copy between two s3 locations
+    # same or different bucket
     s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/')
 
-**Delete multiple files from s3.**
+    # delete (recursively) entire prefix
+    s3shutil.rmtree('s3://bucket/my-files/documents/')
 
-s3shutil will notice and internally use batch delete.
+
+**Just released! (December 2023), tree_sync operation:**
+
+Only copies files that are missing in the destination.
+Also deletes extra files.
+
 
 .. code-block:: python
 
-    import s3shutil
-    s3shutil.rmtree('s3://bucket/my-files/documents/')
+    # sync download
+    s3shutil.tree_sync('s3://bucket/my-files/documents/', '/home/myuser/documents')
+
+    # sync upload
+    s3shutil.tree_sync('/home/myuser/documents', 's3://bucket/my-files/documents/')
+
+    # sync two bucket locations
+    s3shutil.tree_sync('s3://bucket/my-files/documents/', 's3://another-bucket/a/b/c')
+
+
+Conclusions
+~~~~~~~~~~~~~~
+s3shutil will notice alone if the location is s3 (starts with s3://) or not
+All operations have a similar string based API of powerfull one liners
+
+Contact
+~~~~~~~~~~~~~~
+Just use it! You can send an email as well `andyworms@gmail.com`.
+All emails are (eventually) answered.
+Also read the code, fork, open a PR, start a discussion.
+

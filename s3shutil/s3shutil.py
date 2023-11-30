@@ -1,17 +1,17 @@
-
-from os.path import join, relpath, dirname, exists
+import os.path
+from os.path import join, relpath, dirname, basename, isdir
 from os import walk, unlink, makedirs
 
 import logging
 import threading
-import sys
 import itertools
 import heapq
 import boto3
 import functools
 import shutil
 
-log = logging.getLogger('eng')
+log = logging.getLogger('s3shutil')
+debug_iterators = False
 
 try:
     from itertools import batched as itertools_batched
@@ -28,6 +28,8 @@ except:
             yield current_batch
 
 def debug_iterator(name, it):
+    if not debug_iterators:
+        return it
     copy1, copy2 = itertools.tee(it)
     l = list(copy1)
     log.info('DEBUG, iterator %s of length %s', name, len(l))
@@ -106,6 +108,9 @@ class generic_path:
     def get_path(self):
         pass
 
+    def filename(self):
+        pass
+
 
 class fs_path(generic_path):
     """valid objects are strings"""
@@ -130,6 +135,9 @@ class fs_path(generic_path):
 
     def get_path(self):
         return self.path
+
+    def filename(self):
+        return basename(self.path)
 
     def __str__(self):
         return f'fs://{self.path}'
@@ -162,6 +170,9 @@ class s3_path(generic_path):
     def get_path(self):
         return self.bucket, self.path
 
+    def filename(self):
+        return self.path.split('/')[-1]
+
     def __str__(self):
         return f's3://{self.bucket}/{self.path}'
 
@@ -172,32 +183,32 @@ class GenericOps:
 
     def __init__(self):
         self.b3 = get_thread_local_boto3()
+        self.log = logging.getLogger('s3shutil.ops')
 
     def generic_list(self, src):
-        log.info('Doing generic list of %s', src)
+        self.log.info('generic_list src=%s', src)
         if src.get_type() == 's3':
-            log.info('Is s3')
             bucket, prefix = src.get_path()
             s3 = self.b3.client('s3')
             paginator = s3.get_paginator('list_objects_v2')
+            self.log.info('paginate Bucket=%s, Prefix=%s', bucket, prefix)
             for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
                 for entry in page.get('Contents', []):
                     key = entry['Key']
                     obj = s3_path((bucket, key))
-                    log.debug('Found %s', obj)
+                    self.log.debug('Found %s', obj)
                     yield obj
 
         elif src.get_type() == 'fs':
-            log.info('Is fs')
             path = src.get_path()
-            log.info('Root is %s', path)
+            self.log.info('os.walk %s', path)
             for directory, dirs, files in walk(path):
                 dirs.sort()
                 files.sort()
                 for f in files:
                     fp = join(directory, f)
                     obj = fs_path(fp)
-                    log.info('Found %s, file is %s, fp %s, dir %s', obj, f, fp, directory)
+                    self.log.info('Found %s', obj)
                     yield obj
 
         else:
@@ -205,12 +216,20 @@ class GenericOps:
 
     def rm_s3(self, keys):
         bucket, key = keys[0].get_path()
+        self.log.info('rm %s keys, the first one is %s:%s', len(keys), bucket, key)
         keys = [{'Key': k.get_path()[1]} for k in keys]
 
+        if self.log.isEnabledFor(logging.DEBUG):
+            for i, key in enumerate(keys):
+                self.log.debug('key %s is %s', i, key)
+
         s3 = self.b3.client('s3')
-        s3.delete_objects(Bucket=bucket, Delete={'Objects': keys})
+        r = s3.delete_objects(Bucket=bucket, Delete={'Objects': keys})
+        return r
 
     def rm_fs(self, keys):
+        assert len(keys) == 1 # in fs the batch size is 1
+        self.log.info('rm 1 key %s', keys[0])
         for key in keys:
             unlink(key)
 
@@ -229,26 +248,25 @@ class GenericOps:
             if type(dst) == s3_path: #local to s3
                 full_path = src.get_path()
                 bucket, key = dst.get_path()
-                file_exists = exists(full_path)
-                log.info('uploading %s, exists %s', full_path, file_exists)
-                assert exists(file_exists)
+                self.log.info('uploading %s to %s:%s', full_path, bucket, key)
                 r = s3.upload_file(full_path, bucket, key)
-                log.info('uploaded %s to %s:%s', full_path, bucket, key)
-                return
+                return r
         elif type(src) == s3_path:
             src_bucket, src_key = src.get_path()
             if type(dst) == s3_path: #s3 to s3
                 dst_bucket, dst_key = dst.get_path()
                 copy_src = {'Bucket': src_bucket, 'Key': src_key}
                 r = s3.copy_object(Bucket=dst_bucket, Key=dst_key, CopySource=copy_src)
-                log.info('copy %s:%s to %s:%s', src_bucket, src_key, dst_bucket, dst_key)
+                self.log.info('copy %s:%s to %s:%s', src_bucket, src_key, dst_bucket, dst_key)
+                result = r['CopyObjectResult']
+                self.log.info('Result %s', result)
                 return r
             elif type(dst) == fs_path:
                 path = dst.get_path()
                 directory = dirname(path)
                 makedirs(directory, 0o777, exist_ok=True)
                 r = s3.download_file(src_bucket, src_key, path)
-                log.info('downloaded %s:%s to %s', src_bucket, src_key, path)
+                self.log.info('downloaded %s:%s to %s', src_bucket, src_key, path)
                 return r
 
         raise Exception('unsupported')
@@ -258,10 +276,10 @@ class Engine:
     def __init__(self):
         self.b3 = ThreadLocalBoto3()
         self.generic_ops = GenericOps()
+        self.log = logging.getLogger('s3shutil.engine')
 
     def empty_iterator(self):
         return []
-
 
     def tp(self):
         from concurrent.futures import ThreadPoolExecutor
@@ -273,20 +291,26 @@ class Engine:
             self.exhaust_iterator(rs)
 
     def exhaust_iterator(self, it):
-        functools.reduce(lambda x, y: None, it, None)
-
+        self.log.info('waiting for results')
+        ones = map(lambda x: 1, it)
+        count = functools.reduce(lambda x, y: x+y, ones, 0)
+        self.log.info('Iterator count = %s', count)
+        return count
 
     def cp(self, args):
         src, dst = args
         return self.generic_ops.generic_copy(src, dst)
 
+    def generic_copy_file(self, src, dst):
+        self.generic_ops.generic_copy(src, dst)
+
     def generic_copy_tree(self, src_root, dst_root, sync=False):
-        log.info('generic copy tree %s, %s, sync=%s', src_root, dst_root, sync)
+        self.log.info('generic copy tree %s, %s, sync=%s', src_root, dst_root, sync)
         assert issubclass(type(src_root), generic_path) or src_root is None
         assert issubclass(type(dst_root), generic_path)
 
         if src_root is None:
-            log.info('Src is root, we are deleting dst')
+            self.log.info('Src is root, we are deleting dst')
             src_keys = self.empty_iterator()
         else:
             src_keys = self.generic_ops.generic_list(src_root)
@@ -339,11 +363,11 @@ class Engine:
         delete_batched = debug_iterator('delete batched', delete_batched)
 
         with self.tp() as tp:
+            self.log.info('submitting deletes')
             del_r = tp.map(self.generic_ops.rm_generic, delete_batched)
+            self.log.info('submitting copies')
             cp_r = tp.map(self.cp, cp_params)
             self.exhaust_iterator(itertools.chain(cp_r, del_r))
-
-
 
 
 def tree_sync(src, dst):
@@ -353,12 +377,14 @@ def tree_sync(src, dst):
     e = Engine()
     e.generic_copy_tree(src_path, dst_path, sync=True)
 
+
 def tree_copy(src, dst):
     src_path = generic_parse_path(src)
     dst_path = generic_parse_path(dst)
 
     e = Engine()
     e.generic_copy_tree(src_path, dst_path, sync=False)
+
 
 def tree_rm(src):
     src_path = generic_parse_path(src)
@@ -374,33 +400,39 @@ def tree_move(src, dst):
     else:
         shutil.rmtree(src)
 
+
+def copyfile(src, dst):
+    src_path = generic_parse_path(src)
+    dst_path = generic_parse_path(dst)
+
+    e = Engine()
+    e.generic_copy_file(src_path, dst_path)
+
+def copy(src, dst):
+    src_path = generic_parse_path(src)
+    dst_path = generic_parse_path(dst)
+
+    basename = src_path.filename()
+
+    if dst_path.get_type() == 's3':
+        bucket, path = dst_path.get_path()
+        if path[-1] == '/':
+            dst_path = s3_path((bucket, f'{path}{basename}'))
+
+    elif dst_path.get_type() == 'fs':
+        path = dst_path.get_path()
+        if isdir(path):
+            joined = join(path, basename)
+            dst_path = fs_path(joined)
+
+    e = Engine()
+    e.generic_copy_file(src_path, dst_path)
+
+def disk_usage(src):
+    pass
+
+copy2 = copy
+
 rmtree = tree_rm
 copytree = tree_copy
 move = tree_move
-
-def main():
-
-    eng = logging.getLogger('eng')
-    logging.getLogger().setLevel(logging.WARN)
-    eng.setLevel(logging.DEBUG)
-    logging.basicConfig(stream=sys.stdout, format='%(levelname)s:%(threadName)s:%(message)s')
-
-    bucket = 's3shutil-test-bucket-vvlv7xebuek'
-    prefix = '1/2/4/'
-    local_root = '/Users/aworms/src/s3shutil/s3shutil/sample'
-
-    s3p = f's3://{bucket}/{prefix}'
-
-    print('copy up')
-    tree_copy(local_root, s3p)
-    exit(0)
-
-    print('copy down')
-    tree_copy(s3p, local_root)
-
-    print('del s3')
-    tree_rm(s3p)
-
-
-if __name__=='__main__':
-    main()

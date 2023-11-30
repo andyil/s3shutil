@@ -12,6 +12,7 @@ class S3TestHelp:
         self.prefix = 's3shutil-test-bucket-'
         self.client = None
         self.region_name = None
+        self.log = logging.getLogger('s3testhelp')
 
     def get_client(self):
         if self.client is None:
@@ -49,11 +50,13 @@ class S3TestHelp:
         return bucket, prefix
 
     def s3_root_to_json(self, root):
+        assert root.startswith('s3://')
         s3 = self.get_client()
         parts = root.split('/')        
         bucket = parts[2]
         prefix = '/'.join(parts[3:])
         result = []
+        self.log.info('list_objects bucket %s, prefix %s', bucket, prefix)
         r = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
         contents = r.get('Contents', [])
         for elem in contents:            
@@ -69,6 +72,7 @@ class S3TestHelp:
         return result
 
     def fs_root_to_json(self, root):
+        assert not root.startswith('s3://')
         all_files = []
         for dir, dirs, files in os.walk(root):
             dirs.sort()

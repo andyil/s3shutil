@@ -10,10 +10,13 @@ import random
 import logging
 import sys
 
-eng = logging.getLogger('eng')
 logging.getLogger().setLevel(logging.WARN)
-eng.setLevel(logging.INFO)
-logging.basicConfig(stream=sys.stdout, format='%(levelname)s:%(threadName)s:%(message)s')
+logging.getLogger('s3shutil').setLevel(logging.INFO)
+logging.getLogger('s3testhelp').setLevel(logging.INFO)
+logging.getLogger('tests').setLevel(logging.INFO)
+
+logging.basicConfig(stream=sys.stdout, format='%(levelname)s:[%(threadName)s]:%(name)s:%(message)s')
+
 
 caller = boto3.client('sts').get_caller_identity()
 
@@ -21,13 +24,19 @@ class TestS3Shutil(unittest.TestCase):
 
     def setUp(self):
         self.s3th = s3testhelp.S3TestHelp()
-        self.fsroot1 = tempfile.mkdtemp(suffix='-fsroot1', prefix='s3shutil-')
-        self.fsroot2 = tempfile.mkdtemp(suffix='-fsroot2', prefix='s3shutil-')
+        self.fsroot1 = tempfile.mkdtemp(suffix='-111111', prefix='s3s-111111-')
+        self.fsroot2 = tempfile.mkdtemp(suffix='-222222', prefix='s3s-222222-')
         self.s3root1 = self.s3th.get_tests_root()
         self.s3root2 = self.s3th.get_tests_root()
 
+        self.log = logging.getLogger('tests')
+        self.log.info('RUNNING TEST %s', self)
+        self.log.info('s3root1 %s', self.s3root1)
+        self.log.info('s3root2 %s', self.s3root2)
+
         self.maxDiff = None
-        
+
+
     
     def assertObjEq(self, o1, o2, msg=None):
         jsondiff = deepdiff.DeepDiff(o1, o2).to_json()
@@ -217,9 +226,227 @@ class TestS3Shutil(unittest.TestCase):
 
         self.assertObjEq(j0, j2)
 
-        
+    def test_copyfile_up(self):
+        path = os.path.join(self.fsroot1, 'jhello.txt')
+        self.write(path)
 
-   
+        dst_name = 'destination.txt'
+
+        dst = f'{self.s3root1}{dst_name}'
+        s3shutil.copyfile(path, dst)
+
+        j1 = self.s3th.fs_root_to_json(self.fsroot1)
+        j2 = self.s3th.s3_root_to_json(self.s3root1)
+
+        j1[0]['Key'] = dst_name
+
+        print(j1)
+        print(j2)
+        self.assertObjEq(j1, j2)
+
+    def test_copyfile_down(self):
+        path = os.path.join(self.fsroot1, 'jhello.txt')
+        self.write(path)
+
+        dst_name1 = 'destination.txt'
+        dst_name2 = 'destination-c.txt'
+
+        dst = f'{self.s3root1}{dst_name1}'
+        s3shutil.copyfile(path, dst)
+
+        dst2 = os.path.join(self.fsroot2, dst_name2)
+
+        s3shutil.copyfile(dst, dst2)
+
+        j1 = self.s3th.fs_root_to_json(self.fsroot1)
+        j2 = self.s3th.fs_root_to_json(self.fsroot2)
+
+
+        print(j1)
+        print(j2)
+        j1[0]['Key'] = dst_name2
+
+
+        self.assertObjEq(j1, j2)
+
+
+    def test_copyfile_s3_to_s3(self):
+        path = os.path.join(self.fsroot1, 'jhello.txt')
+        self.write(path)
+
+        dst_name1 = 'destination.txt'
+        dst_name2 = 'destination-c.txt'
+
+        dst = f'{self.s3root1}{dst_name1}'
+
+        self.log.info('copyfile %s %s', path, dst)
+        s3shutil.copyfile(path, dst)
+
+        dst2 = f'{self.s3root2}{dst_name2}'
+
+        self.log.info('copyfile %s %s', dst, dst2)
+        s3shutil.copyfile(dst, dst2)
+
+        self.log.info('Checking s3root1 %s', self.s3root1)
+        j1 = self.s3th.s3_root_to_json(self.s3root1)
+        self.log.info(f'j1 {j1}')
+
+        self.log.info('Checking s3root2 %s', self.s3root2)
+        j2 = self.s3th.s3_root_to_json(self.s3root2)
+        self.log.info(f'j2 {j2}')
+
+        j1[0]['Key'] = dst_name2
+
+        self.assertObjEq(j1, j2)
+
+    def test_copy_up_to_file(self):
+        path = os.path.join(self.fsroot1, 'jhello.txt')
+        self.write(path)
+
+        dst_name = 'destination.txt'
+
+        dst = f'{self.s3root1}{dst_name}'
+        s3shutil.copy(path, dst)
+
+        j1 = self.s3th.fs_root_to_json(self.fsroot1)
+        j2 = self.s3th.s3_root_to_json(self.s3root1)
+
+        j1[0]['Key'] = dst_name
+
+        print(j1)
+        print(j2)
+        self.assertObjEq(j1, j2)
+
+    def test_copy_down_to_file(self):
+        path = os.path.join(self.fsroot1, 'jhello.txt')
+        self.write(path)
+
+        dst_name1 = 'destination.txt'
+        dst_name2 = 'destination-c.txt'
+
+        dst = f'{self.s3root1}{dst_name1}'
+        s3shutil.copy(path, dst)
+
+        dst2 = os.path.join(self.fsroot2, dst_name2)
+
+        s3shutil.copy(dst, dst2)
+
+        j1 = self.s3th.fs_root_to_json(self.fsroot1)
+        j2 = self.s3th.fs_root_to_json(self.fsroot2)
+
+
+        print(j1)
+        print(j2)
+        j1[0]['Key'] = dst_name2
+
+
+        self.assertObjEq(j1, j2)
+
+
+    def test_copy_s3_to_s3_to_file(self):
+        path = os.path.join(self.fsroot1, 'jhello.txt')
+        self.write(path)
+
+        dst_name1 = 'destination.txt'
+        dst_name2 = 'destination-c.txt'
+
+        dst = f'{self.s3root1}{dst_name1}'
+
+        self.log.info('copyfile %s %s', path, dst)
+        s3shutil.copy(path, dst)
+
+        dst2 = f'{self.s3root2}{dst_name2}'
+
+        self.log.info('copyfile %s %s', dst, dst2)
+        s3shutil.copy(dst, dst2)
+
+        self.log.info('Checking s3root1 %s', self.s3root1)
+        j1 = self.s3th.s3_root_to_json(self.s3root1)
+        self.log.info(f'j1 {j1}')
+
+        self.log.info('Checking s3root2 %s', self.s3root2)
+        j2 = self.s3th.s3_root_to_json(self.s3root2)
+        self.log.info(f'j2 {j2}')
+
+        j1[0]['Key'] = dst_name2
+
+        self.assertObjEq(j1, j2)
+
+
+    def test_copy_up_to_dir(self):
+        n = 'jhello.txt'
+        path = os.path.join(self.fsroot1, n)
+        self.write(path)
+
+        dst_name = 'destination'
+
+        dst = f'{self.s3root1}{dst_name}/'
+        s3shutil.copy(path, dst)
+
+        j1 = self.s3th.fs_root_to_json(self.fsroot1)
+        j2 = self.s3th.s3_root_to_json(self.s3root1)
+
+        j1[0]['Key'] = f'{dst_name}/{n}'
+
+        print(j1)
+        print(j2)
+        self.assertObjEq(j1, j2)
+
+    def test_copy_down_to_dir(self):
+        path = os.path.join(self.fsroot1, 'jhello.txt')
+        self.write(path)
+
+        dst_name1 = 'destination.txt'
+        dst_name2 = 'destination-dir'
+
+        dst = f'{self.s3root1}{dst_name1}'
+        s3shutil.copy(path, dst)
+
+        dst2 = os.path.join(self.fsroot2, dst_name2)
+
+        s3shutil.copy(dst, dst2)
+
+        j1 = self.s3th.fs_root_to_json(self.fsroot1)
+        j2 = self.s3th.fs_root_to_json(self.fsroot2)
+
+
+        print(j1)
+        print(j2)
+        j1[0]['Key'] = dst_name2
+
+        self.assertObjEq(j1, j2)
+
+
+    def test_copy_s3_to_s3_to_dir(self):
+        path = os.path.join(self.fsroot1, 'jhello.txt')
+        self.write(path)
+
+        dst_name1 = 'destination.txt'
+        dst_name2 = 'destination-folder'
+
+        dst = f'{self.s3root1}{dst_name1}'
+
+        self.log.info('copyfile 1 %s %s', path, dst)
+        s3shutil.copyfile(path, dst)
+
+        dst2 = f'{self.s3root2}{dst_name2}/'
+
+        self.log.info('copy 2 %s %s', dst, dst2)
+        s3shutil.copy(dst, dst2)
+
+        self.log.info('Checking s3root1 %s', self.s3root1)
+        j1 = self.s3th.s3_root_to_json(self.s3root1)
+        self.log.info(f'j1 {j1}')
+
+        self.log.info('Checking s3root2 %s', self.s3root2)
+        j2 = self.s3th.s3_root_to_json(self.s3root2)
+        self.log.info(f'j2 {j2}')
+
+        j1[0]['Key'] = 'destination-folder/destination.txt'
+
+        self.assertObjEq(j1, j2)
+
+
 
 if __name__ == '__main__':
     unittest.main()
