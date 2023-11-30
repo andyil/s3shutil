@@ -13,7 +13,7 @@ Python library to copy, sync and move files to and from s3
 
 .. |Language| image:: https://img.shields.io/github/languages/top/andyil/s3shutil
 
-s3shutil is the easiest to use and fastest way of moving around directories and files in s3.
+**s3shutil is the easiest to use and fastest way of moving around directories and files in s3.**
 
 
 .. note::
