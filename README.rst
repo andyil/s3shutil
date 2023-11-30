@@ -107,7 +107,7 @@ All operations have a similar string based API of powerfull one liners
 
 Contact
 ~~~~~~~~~~~~~~
-Just use it! You are also invited to send an email `andyworms@g mail.com <mailto:andyworms@g mail.com>`.
+Just use it! You are also invited to send an email `andyworms@gmail.com`.
 All emails are eventually answered.
 Read the code, fork, open a PR, start a discussion.
 
