@@ -1,5 +1,5 @@
 ===================================================
-Easy pythonic API to copy and sync to and from s3
+Pyhon Library to copy, sync, move files to and from s3
 ===================================================
 |Unittests| |License| |Downloads| |Language|
 
@@ -40,10 +40,11 @@ We recommend installing from the official PyPI repository.
 Design Principles
 ~~~~~~~~~~~~~~~~~
 * A simple and intuitive string based API.
-* Expose powerful one-liners.
+* Symmetric API: download and uploads work equally
+* Exposes powerful and performant one-liners.
 * Emulate the well known `shutil <https://docs.python.org/3/library/shutil.html>`_ standard module API.
 * Use performance boosts behind the scenes (multithreading, batching, server to server operations)
-* No dependencies, where possible
+* No dependencies except boto3
 
 
 Using s3shutil
@@ -65,15 +66,12 @@ Using s3shutil is super easy:
     # download a tree from s3
     s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/')
 
-
     # upload a tree to s3
     s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/')
-
 
     # copy between two s3 locations
     # same or different bucket
     s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/')
-
 
     # delete (recursively) entire prefix
     s3shutil.rmtree('s3://bucket/my-files/documents/')
@@ -90,14 +88,11 @@ Also deletes extra files.
     # sync download
     s3shutil.tree_sync('s3://bucket/my-files/documents/', '/home/myuser/documents')
 
-
     # sync upload
     s3shutil.tree_sync('/home/myuser/documents', 's3://bucket/my-files/documents/')
 
-
     # sync two bucket locations
     s3shutil.tree_sync('s3://bucket/my-files/documents/', 's3://another-bucket/a/b/c')
-
 
 
 Conclusions
