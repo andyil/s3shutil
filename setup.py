@@ -14,7 +14,7 @@ setup(
   keywords = ['aws', 's3', 'cloud', 'storage', 'shutil', 'network'],
   install_requires=['boto3'],
   classifiers=[
-    'Development Status :: 3 - Alpha',
+    'Development Status :: 4 - Beta',
     'Intended Audience :: Developers',
     'Intended Audience :: Information Technology',
     'Intended Audience :: System Administrators',
