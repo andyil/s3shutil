@@ -51,14 +51,8 @@ jobs:
         python-version: "3.7"
     - name: Install dependencies
       run: |
-        python -m pip install boto3 deepdiff
-    - name: v
+        python -m pip install tox
+    - name: tox
       run: |
-        python3 -V
-    - name: v12
-      run: |
-        python3.12 -V
-
-    - name: Run unit tests
-      run: |
-        python -m unittests.short_tests
+        tox
+    
