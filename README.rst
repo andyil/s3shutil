@@ -1,7 +1,7 @@
 ===========================================================
 Python library to copy, sync and move files to and from s3
 ===========================================================
-|Unittests| |License| |Downloads| |Language|
+|Unittests| |License| |Downloads| |Language| |PyVersions|
 
 .. |Unittests| image:: https://github.com/andyil/s3shutil/actions/workflows/unitests.yml/badge.svg
     
@@ -12,6 +12,8 @@ Python library to copy, sync and move files to and from s3
     :alt: License
 
 .. |Language| image:: https://img.shields.io/github/languages/top/andyil/s3shutil
+
+.. |PyVersions| image:: https://img.shields.io/pypi/pyversions/s3shutil.svg
 
 **s3shutil is the easiest to use and fastest way of moving around directories and files in s3.**
 
@@ -98,6 +100,32 @@ Conclusions
 ~~~~~~~~~~~~~~
 s3shutil will notice alone if the location is s3 (starts with s3://) or not
 All operations have a similar string based API of powerfull one liners
+
+
+Test Matrix
+~~~~~~~~~~~~~~
+s3shutil is thoroughly unit tested in all the combinations of:
+
+Python Versions:
+
++ 3.12
++ 3.11 
++ 3.10
++ 3.9
++ 3.8
++ 3.7
+
+And boto3 Versions: 
+
++ 1.33
++ 1.30
++ 1.28
++ 1.27
++ 1.26
++ 1.25
++ 1.24
++ 1.23
+
 
 Contact
 ~~~~~~~~~~~~~~
