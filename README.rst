@@ -63,14 +63,14 @@ Using s3shutil is super easy:
 .. code-block:: python
 
     # download a tree from s3
-    s3shutil.copytree('s3://bucket/remote/files/', '/home/myuser/my-directory/')
+    s3shutil.copytree('s3://bucket/my/path', '/home/myuser/files/')
 
     # upload a tree to s3
-    s3shutil.copytree('/home/myuser/documents', 's3://bucket/my-files/documents/')
+    s3shutil.copytree('/home/users/pics/', 's3://bucket/path/archive/')
 
     # copy between two s3 locations
     # same or different bucket
-    s3shutil.copytree('s3://other-bucket/source-files/whatever/', 's3://bucket/my-files/documents/')
+    s3shutil.copytree('s3://bucket2/files/someth/', 's3://bucket1/backup/old/')
 
     # delete (recursively) entire prefix
     s3shutil.rmtree('s3://bucket/my-files/documents/')
@@ -85,13 +85,13 @@ Also deletes extra files.
 .. code-block:: python
 
     # sync download
-    s3shutil.tree_sync('s3://bucket/my-files/documents/', '/home/myuser/documents')
+    s3shutil.tree_sync('s3://bucket/files/docs/', '/home/myuser/docs')
 
     # sync upload
-    s3shutil.tree_sync('/home/myuser/documents', 's3://bucket/my-files/documents/')
+    s3shutil.tree_sync('/home/myuser/files/', 's3://bucket/files/docs-v2/')
 
     # sync two bucket locations
-    s3shutil.tree_sync('s3://bucket/my-files/documents/', 's3://another-bucket/a/b/c')
+    s3shutil.tree_sync('s3://bucket/files/docs/', 's3://bucket2/a/b/c')
 
 
 Conclusions
