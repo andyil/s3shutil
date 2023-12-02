@@ -1,5 +1,5 @@
 ===========================================================
-Python library to copy, sync and move files to and from s3
+Pythonic copy, sync and move files to and from s3
 ===========================================================
 |Unittests| |License| |Downloads| |Language| |PyVersions|
 
