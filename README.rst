@@ -3,6 +3,10 @@ Python library to copy, sync and move files to and from s3
 ===========================================================
 |Unittests| |License| |Downloads| |Language| |PyVersions|
 
+.. image:: https://raw.githubusercontent.com/andyil/s3shutil/master/s3shutil-logo.png
+  :width: 800
+  :alt: s3shutil logo
+
 .. |Unittests| image:: https://github.com/andyil/s3shutil/actions/workflows/unitests.yml/badge.svg
     
 .. |Downloads| image:: https://img.shields.io/pypi/dw/s3shutil
