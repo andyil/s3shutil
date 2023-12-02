@@ -55,5 +55,5 @@ jobs:
     - name: tox
       run: |
         env | egrep AWS
-        echo tox --parallel 20
+        tox --parallel 20
     
