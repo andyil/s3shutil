@@ -7,8 +7,11 @@ import shutil
 import deepdiff
 import os
 import random
+import secrets
 import logging
 import sys
+
+
 
 logging.getLogger().setLevel(logging.WARN)
 logging.getLogger('s3shutil').setLevel(logging.INFO)
@@ -45,7 +48,7 @@ class TestS3Shutil(unittest.TestCase):
     def write(self, path, body=None):
         if body is None:
             length = random.randrange(1_000, 10_000)
-            body = random.randbytes(length)
+            body = secrets.token_bytes(length)
         if type(body) == str:
             mode = 'w'
         else:
