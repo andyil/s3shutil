@@ -54,6 +54,6 @@ jobs:
         python -m pip install tox
     - name: tox
       run: |
-        env
+        env | egrep AWS
         echo tox --parallel 20
     
