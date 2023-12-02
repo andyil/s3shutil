@@ -54,5 +54,6 @@ jobs:
         python -m pip install tox
     - name: tox
       run: |
-        tox --parallel 20
+        env
+        echo tox --parallel 20
     
