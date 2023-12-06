@@ -22,7 +22,6 @@ Pythonic copy, move and sync for Amazon S3
 **s3shutil is the easiest to use and fastest way of moving around directories and files in s3.**
 
 
-.. note::
    *December  2023:*  New! sync operation
 
    Sync operation allows you to incrementally copy to destination files that
