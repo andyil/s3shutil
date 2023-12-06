@@ -42,7 +42,7 @@ We recommend installing from the official PyPI repository.
 
 
 Design Principles
-~~~~~~~~~~~~~~~~~
+---------------
 * A simple and intuitive string based API.
 * Symmetric API: download and uploads work equally
 * Exposes powerful and performant one-liners.
@@ -50,9 +50,23 @@ Design Principles
 * Use performance boosts behind the scenes (multithreading, batching, server to server operations)
 * No dependencies except boto3
 
+Similar Projects
+---------------
+aws-cli is amazing if you need to run from the command line or shell script. But does not expose a python API. 
+
+s3fs is solid and has amassed a sizeable community. s3fs exposes a object oriented API. s3shutil exposes a 
+simple string oriented API that enables really simple one liners. Another advangtage of s3shutil is that it is 
+symmetric and agnostic to the direction data is moving: with s3shutil it is the same to upload or download or sync files.
+
+You can configure bucket lifecyele rules to mass delete objects, but that is more of a governance feature than a library 
+you can run inside code following your own login and timing.
+
+S3 replication is good to for copying new files, but it will not copy retroactively existing objects.
+
+
 
 Using s3shutil
-~~~~~~~~~~~~~~
+---------------
 s3shutil uses `boto3 <https://github.com/boto/boto3>`_ internally and we assume you have your credentials set up properly.
 
 Using s3shutil is super easy:
@@ -100,13 +114,13 @@ Also deletes extra files.
 
 
 Conclusions
-~~~~~~~~~~~~~~
+---------------
 s3shutil will notice alone if the location is s3 (starts with s3://) or not
 All operations have a similar string based API of powerfull one liners
 
 
 Test Matrix
-~~~~~~~~~~~~~~
+---------------
 s3shutil is thoroughly unit tested in all the combinations of:
 
 Python Versions:
@@ -130,8 +144,8 @@ And boto3 Versions:
 + 1.23
 
 
-Contact
-~~~~~~~~~~~~~~
+Contact me
+---------------
 Just use it! You can send an email as well `andyworms@gmail.com`.
 All emails are (eventually) answered.
 Also read the code, fork, open a PR, start a discussion.
