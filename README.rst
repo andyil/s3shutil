@@ -23,7 +23,7 @@ Pythonic copy, move and sync for Amazon S3
 
 
 .. note::
-   December 1st, 2023. Just released sync operation
+   *December  2023:*  New! sync operation
 
    Sync operation allows you to incrementally copy to destination files that
    were added to source since the last copy
