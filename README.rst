@@ -1,5 +1,5 @@
 ===========================================================
-Pythonic copy, sync and move files to and from s3
+Pythonic copy, move and sync for Amazon S3
 ===========================================================
 |Unittests| |License| |Downloads| |Language| |PyVersions|
 
